@@ -1,0 +1,12 @@
+node_modules
+dist
+.DS_Store
+*.log
+.vite
+.claude/scheduled_tasks.lock
+
+# Excel data files are user-provided and change often — don't commit the data itself.
+excel/*.xlsx
+excel/*.xls
+!excel/README.md
+!excel/.gitkeep
