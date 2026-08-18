@@ -16,8 +16,8 @@ const CAST_STAGES = ["SO","PMDR","PWAX-A","PWAX-B","PWAX","PWXST","PWBGD","PWBGD
 
 // Custom production-funnel grouping (per-column mapping supplied manually).
 // Columns not yet assigned to a group (JTRI, PTRI, casting Pcs/Casting wts, PREJ,
-// SHP4, and everything from ADI-SCSD onward) are intentionally left out for now —
-// rows whose peak stage falls in one of those columns fall back to "Not on floor".
+// Sale, Closed) are intentionally left out for now — rows whose peak stage falls
+// in one of those columns fall back to "Not on floor".
 const MACRO = {
   "New Order": ["SO"],
   "Model Pending": ["PMDR"],
@@ -31,11 +31,13 @@ const MACRO = {
   "Polish": ["PPOLCL-1","PPOLCL-2","PPOLCL-3","PPOLCL-4","PPOL","JPRPOL","JPOL","PPOLCL-5"],
   "Rodium": ["JRHD","PRHD","PRHD-A"],
   "PQC": ["PQC"],
-  "Third Party QC": ["PTPQC","PTPQC-A","JTPQC"],
+  "Third Party QC": ["PTPQC","PTPQC-A","JTPQC","SHP4"],
   "Sampling": ["S1FIL","S1MSET","S1POL","S2FIL","S2SET","S2POL","S2FQC"],
   "Job Work": ["PJBW","PJBW-A","PPLT","GSI-REJ"],
   "GSI": ["PCELL","SHP3"],
   "FG": ["FG","SHP1","SHP2","RGTS"],
+  "Adi Nath": ["ADI-SCSD","ADI-RDSET","ADI-PTPFIL","ADI-PFIL","ADI-PPRPOL","ADI-PTPSET","ADI-SET","ADI-PPOL","ADI-PTPPOL","ADI-HOLD","ADI-JBOUT"],
+  "Others": ["Others"],
 };
 
 const CATNAME = { RNG:"Rings", EAR:"Earrings", BRC:"Bracelets", PND:"Pendants", NCK:"Necklaces", BNG:"Bangles" };

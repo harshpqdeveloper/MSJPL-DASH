@@ -10,7 +10,7 @@ import {
 } from "./icons.jsx";
 import { loadUiSession, saveUiSession } from "./sessionPersistence.js";
 
-const FUNNEL = ["New Order","Model Pending","Wax","PWBGD","Filing","Finding Balance","Single Pre Polish","Setting","MSHDS","Polish","Rodium","PQC","Third Party QC","Sampling","Job Work","GSI","FG"];
+const FUNNEL = ["New Order","Model Pending","Wax","PWBGD","Filing","Finding Balance","Single Pre Polish","Setting","MSHDS","Polish","Rodium","PQC","Third Party QC","Sampling","Job Work","GSI","FG","Adi Nath","Others"];
 const METALS = ["Gold","Silver","Platinum","Other"];
 // Literal hex (not CSS-var strings) — these feed both plain style backgrounds and
 // hex+alpha-suffix tints (e.g. `${METALC[x]}1f`), which only work with real hex values.
