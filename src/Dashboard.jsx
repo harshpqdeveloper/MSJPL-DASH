@@ -245,8 +245,8 @@ export default function Dashboard({ rows: ROWS, meta, fileName, onRefresh }) {
   const monthlyTotals = useMemo(() => {
     const m = {};
     rows.forEach((r) => {
-      m[r.mb] = m[r.mb] || { eq:0, cp:0 };
-      m[r.mb].eq += r.eq; m[r.mb].cp += r.cp;
+      m[r.mb] = m[r.mb] || { bq:0, cp:0 };
+      m[r.mb].bq += r.bq; m[r.mb].cp += r.cp;
     });
     return monthsOrder.filter((mo) => m[mo]).map((mo) => m[mo]);
   }, [rows, monthsOrder]);
@@ -392,9 +392,9 @@ export default function Dashboard({ rows: ROWS, meta, fileName, onRefresh }) {
           {/* ---------- Overview ---------- */}
           <div ref={sectionRefs.overview}>
             <div className="grid-stats" style={{ marginBottom:20 }}>
-              <StatCard label="Export Quantity" rawValue={k.eq} format={fmt} unit="pcs" sub={`${fmt(k.lines)} lines · ${fmt(k.fq)} on floor`}
+              <StatCard label="Export Quantity" rawValue={k.bq} format={fmt} unit="pcs" sub={`${fmt(k.lines)} lines · ${fmt(k.fq)} on floor`}
                 icon={<IconTrendingUp width={20} height={20} />} accent={CH.blue} tint="rgba(59,130,246,.13)" grad={GRAD_BLUE}
-                sparkline={monthlyTotals.map((m) => m.eq)} delay={0} />
+                sparkline={monthlyTotals.map((m) => m.bq)} delay={0} />
               <StatCard label="Casting Pcs" rawValue={k.cp} format={fmt} unit="pcs" sub="in wax → casting"
                 icon={<IconLayers width={20} height={20} />} accent={CH.violet} tint="rgba(124,58,237,.13)" grad={GRAD_PURPLE}
                 sparkline={monthlyTotals.map((m) => m.cp)} delay={40} />
@@ -557,7 +557,7 @@ export default function Dashboard({ rows: ROWS, meta, fileName, onRefresh }) {
           <div style={{ marginTop:20, fontSize:11, color:C.faint, lineHeight:1.6 }}>
             Sheet <b style={{ color:C.mut }}>{meta.sheetName}</b> · header row {meta.headerRow} · {fmt(ROWS.length)} order lines
             {meta.asOf && <> · snapshot date <b style={{ color:C.mut }}>{meta.asOf}</b> (derived as delivery date − BalDelvDays)</>}.
-            Export Quantity = Exp Bal Qty (col AB). Metal is derived from the Karat code (col S): a value containing G → Gold, P → Platinum, S → Silver.
+            Export Quantity = Bal Qty (col Z). Metal is derived from the Karat code (col S): a value containing G → Gold, P → Platinum, S → Silver.
             Casting pcs = cols AE:AM (AN); casting weight = unit weight (Z) × AN (AO).
             {meta.missing.length > 0 && <span style={{ color:"var(--warning-dk)", fontWeight:600 }}> · Missing columns: {meta.missing.join(", ")}.</span>}
           </div>
