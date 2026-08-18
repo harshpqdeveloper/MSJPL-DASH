@@ -233,9 +233,9 @@ export default function Dashboard({ rows: ROWS, meta, fileName, onRefresh }) {
   const maxPhase = Math.max(...phase.map((p) => p.qty), 1);
   const bottleneck = phase.filter((p) => p.name !== "Order booked").reduce((a, b) => (b.qty > (a?.qty || 0) ? b : a), null);
 
-  const byParty = useMemo(() => { const base = ROWS.filter((r) => (cat === "All" || r.cat === cat) && (metal === "All" || metalOf(r) === metal));
-    const m = {}; base.forEach((r) => { m[r.p] = (m[r.p] || 0) + r.bq; });
-    return Object.entries(m).map(([name, bq]) => ({ name, bq })).sort((a, b) => b.bq - a.bq).slice(0, 10); }, [ROWS, cat, metal]);
+  const byCustomer = useMemo(() => { const base = ROWS.filter((r) => (cat === "All" || r.cat === cat) && (metal === "All" || metalOf(r) === metal));
+    const m = {}; base.forEach((r) => { m[r.c] = (m[r.c] || 0) + r.bq; });
+    return Object.entries(m).map(([name, bq]) => ({ name, bq })).sort((a, b) => b.bq - a.bq); }, [ROWS, cat, metal]);
 
   const byCat = useMemo(() => { const m = {}; rows.forEach((r) => (m[r.cat] = (m[r.cat] || 0) + r.bq));
     return Object.entries(m).map(([name, qty]) => ({ name, qty })).sort((a, b) => b.qty - a.qty); }, [rows]);
@@ -517,9 +517,9 @@ export default function Dashboard({ rows: ROWS, meta, fileName, onRefresh }) {
 
           {/* ---------- Party & mix ---------- */}
           <div ref={sectionRefs.partymix} className="grid2" style={{ marginBottom:20 }}>
-            <Panel title="Balance by party" hint="top 10 by balance qty" delay={260}>
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={byParty} layout="vertical" margin={{ top:4, right:56, left:8, bottom:0 }}>
+            <Panel title="Balance by customer" hint="all customers by balance qty" delay={260}>
+              <ResponsiveContainer width="100%" height={Math.max(280, byCustomer.length * 28)}>
+                <BarChart data={byCustomer} layout="vertical" margin={{ top:4, right:56, left:8, bottom:0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={CH.line} horizontal={false} />
                   <XAxis type="number" tick={{ fill:CH.faint, fontSize:11 }} axisLine={false} tickLine={false} />
                   <YAxis type="category" dataKey="name" tick={{ fill:CH.mut, fontSize:11 }} axisLine={false} tickLine={false} width={104} />

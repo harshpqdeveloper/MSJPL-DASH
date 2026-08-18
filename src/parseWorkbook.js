@@ -114,6 +114,7 @@ export function parseWorkbook(arrayBuffer) {
 
   const col = {
     party: idxOf("Party"),
+    customer: idxOf("Customer"),
     srno: idxOf("Order SrNo"),
     otype: idxOf("Order Type"),
     delv: idxOf("Prd Delv Dt"),
@@ -169,6 +170,7 @@ export function parseWorkbook(arrayBuffer) {
 
     rows.push({
       p: col.party >= 0 ? norm(row[col.party]) || "—" : "—",
+      c: col.customer >= 0 ? norm(row[col.customer]) || "—" : "—",
       cat: CATNAME[catRaw] || catRaw || "—",
       k: karat,
       mt: metalFromKarat(karat),
