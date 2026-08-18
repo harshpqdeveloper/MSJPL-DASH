@@ -231,6 +231,7 @@ export default function Dashboard({ rows: ROWS, meta, fileName, onRefresh }) {
   const phase = useMemo(() => { const m = {}; rows.forEach((r) => { if (FUNNEL.includes(r.ph)) m[r.ph] = (m[r.ph] || 0) + r.bq; });
     return FUNNEL.filter((p) => m[p] > 0).map((p) => ({ name:p, qty:m[p] })); }, [rows]);
   const maxPhase = Math.max(...phase.map((p) => p.qty), 1);
+  const phaseTotal = useMemo(() => phase.reduce((s, p) => s + p.qty, 0), [phase]);
   const bottleneck = phase.filter((p) => p.name !== "Order booked").reduce((a, b) => (b.qty > (a?.qty || 0) ? b : a), null);
 
   const byCustomer = useMemo(() => { const base = ROWS.filter((r) => (cat === "All" || r.cat === cat) && (metal === "All" || metalOf(r) === metal));
@@ -240,6 +241,7 @@ export default function Dashboard({ rows: ROWS, meta, fileName, onRefresh }) {
 
   const byCat = useMemo(() => { const m = {}; rows.forEach((r) => (m[r.cat] = (m[r.cat] || 0) + r.bq));
     return Object.entries(m).map(([name, qty]) => ({ name, qty })).sort((a, b) => b.qty - a.qty); }, [rows]);
+  const byCatTotal = useMemo(() => byCat.reduce((s, c) => s + c.qty, 0), [byCat]);
 
   // Real per-month distribution, used only for the KPI-card sparklines below — every value
   // here is a plain re-aggregation of `rows`, not a projection or fabricated trend.
@@ -490,7 +492,13 @@ export default function Dashboard({ rows: ROWS, meta, fileName, onRefresh }) {
 
           {/* ---------- Funnel ---------- */}
           <div ref={sectionRefs.funnel}>
-            <Panel title="Production funnel" hint="balance pcs by stage, in process order" style={{ marginBottom:20 }} delay={220}>
+            <Panel title="Production funnel" hint="balance pcs by stage, in process order" style={{ marginBottom:20 }} delay={220}
+              right={
+                <span style={{ fontSize:11.5, color:C.mut, background:"var(--panel-2)", border:`1px solid ${C.line}`, borderRadius:999, padding:"5px 12px", fontVariantNumeric:"tabular-nums" }}>
+                  Total: <b style={{ color:C.text, fontWeight:800 }}>{fmt(phaseTotal)}</b> pcs
+                </span>
+              }
+            >
               <div style={{ display:"flex", flexDirection:"column", gap:9 }}>
                 {phase.map((p) => { const isB = bottleneck && p.name === bottleneck.name; const isStart = p.name === "Order booked";
                   return (<div key={p.name}>
@@ -537,7 +545,13 @@ export default function Dashboard({ rows: ROWS, meta, fileName, onRefresh }) {
                 </BarChart>
               </ResponsiveContainer>
             </Panel>
-            <Panel title="Product mix" hint="balance pcs by category" delay={280}>
+            <Panel title="Product mix" hint="balance pcs by category" delay={280}
+              right={
+                <span style={{ fontSize:11.5, color:C.mut, background:"var(--panel-2)", border:`1px solid ${C.line}`, borderRadius:999, padding:"5px 12px", fontVariantNumeric:"tabular-nums" }}>
+                  Total: <b style={{ color:C.text, fontWeight:800 }}>{fmt(byCatTotal)}</b> pcs
+                </span>
+              }
+            >
               <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
                 <div style={{ flex:"0 0 220px" }}>
                   <ResponsiveContainer width={220} height={230}>
