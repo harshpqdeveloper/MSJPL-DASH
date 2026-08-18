@@ -2,9 +2,10 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { parseWorkbook } from "./parseWorkbook.js";
 import Dashboard from "./Dashboard.jsx";
+import MSJPLIntro from "./MSJPLIntro.jsx";
 import logo from "./assets/logo.png";
 import { C, GLOBAL_CSS } from "./theme.js";
-import { IconSpinner, IconFileWarning, IconInbox } from "./icons.jsx";
+import { IconFileWarning, IconInbox } from "./icons.jsx";
 
 // How often to re-check the excel/ folder for a new or updated file once the
 // dashboard is up. Cheap: it's just a small JSON status fetch unless the file
@@ -16,6 +17,7 @@ export default function App() {
   const [fileName, setFileName] = useState("");
   const [status, setStatus] = useState("loading"); // loading | ready | not-found | error
   const [error, setError] = useState("");
+  const [introDone, setIntroDone] = useState(false);
   const signatureRef = useRef(""); // `${fileName}:${mtimeMs}` of the currently-loaded file
 
   const loadLatest = useCallback(async () => {
@@ -65,12 +67,23 @@ export default function App() {
     return () => clearInterval(id);
   }, [loadLatest]);
 
+  const intro = !introDone && (
+    <MSJPLIntro ready={status !== "loading"} onFinish={() => setIntroDone(true)} />
+  );
+
   if (status === "ready" && data) {
-    return <Dashboard rows={data.rows} meta={data.meta} fileName={fileName} onRefresh={loadLatest} />;
+    return (
+      <>
+        {intro}
+        <Dashboard rows={data.rows} meta={data.meta} fileName={fileName} onRefresh={loadLatest} />
+      </>
+    );
   }
 
   return (
-    <div style={{
+    <>
+      {intro}
+      <div style={{
       minHeight: "100%", position: "relative", overflow: "hidden",
       background: `radial-gradient(1100px 520px at 12% -10%, rgba(124,58,237,.16), transparent 60%),
                    radial-gradient(900px 480px at 105% 10%, rgba(37,99,235,.14), transparent 55%),
@@ -101,17 +114,9 @@ export default function App() {
             color: status === "error" ? "var(--danger-dk)" : "var(--primary-2)",
             display: "flex", alignItems: "center", justifyContent: "center",
           }}>
-            {status === "loading" && <IconSpinner width={24} height={24} />}
             {status === "not-found" && <IconInbox width={24} height={24} />}
             {status === "error" && <IconFileWarning width={24} height={24} />}
           </div>
-
-          {status === "loading" && (
-            <>
-              <div style={{ fontSize: 16.5, fontWeight: 700, marginBottom: 12, color: C.text }}>Loading latest Excel file…</div>
-              <div className="shimmer-bar" style={{ maxWidth: 200, margin: "0 auto" }} />
-            </>
-          )}
 
           {status === "not-found" && (
             <>
@@ -135,6 +140,7 @@ export default function App() {
           Unit Metal PureWt, and the stage columns (SO, PWAX…, PTRI, PCAST … FG, SHP…). The header row is auto-detected.
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
