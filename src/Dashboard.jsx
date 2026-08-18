@@ -229,6 +229,8 @@ export default function Dashboard({ rows: ROWS, meta, fileName, onRefresh }) {
     return METALS.filter((me) => m[me]).map((me) => ({ name:me, ...m[me], fill:METALC[me] })); }, [rows]);
 
   const phase = useMemo(() => { const m = {}; rows.forEach((r) => { if (FUNNEL.includes(r.ph)) m[r.ph] = (m[r.ph] || 0) + r.bq; });
+    // FG is a direct sum of its own columns (like Casting Pcs), not gated by the "peak stage" logic above.
+    m["FG"] = rows.reduce((s, r) => s + r.fg, 0);
     return FUNNEL.filter((p) => m[p] > 0).map((p) => ({ name:p, qty:m[p] })); }, [rows]);
   const maxPhase = Math.max(...phase.map((p) => p.qty), 1);
   const phaseTotal = useMemo(() => phase.reduce((s, p) => s + p.qty, 0), [phase]);

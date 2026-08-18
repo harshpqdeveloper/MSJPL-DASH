@@ -14,6 +14,11 @@ import * as XLSX from "xlsx";
 
 const CAST_STAGES = ["SO","PMDR","PWAX-A","PWAX-B","PWAX","PWXST","PWBGD","PWBGD-LGD","PTRI"];
 
+// FG is reported as a direct sum of its own columns (like Casting Pcs), not via the
+// "peak stage wins" logic the rest of the funnel uses — see the `fg` field below and
+// how it's combined into the funnel in Dashboard.jsx's `phase` useMemo.
+const FG_STAGES = ["FG","SHP1","SHP2","RGTS"];
+
 // Custom production-funnel grouping (per-column mapping supplied manually).
 // Columns not yet assigned to a group (casting Pcs/Casting wts pre-computed columns,
 // PREJ, Sale, Closed) are intentionally left out for now — rows whose peak stage
@@ -37,7 +42,6 @@ const MACRO = {
   "Sampling": ["S1FIL","S1MSET","S1POL","S2FIL","S2SET","S2POL","S2FQC"],
   "Job Work": ["PJBW","PJBW-A","PPLT","GSI-REJ"],
   "GSI": ["PCELL","SHP3"],
-  "FG": ["FG","SHP1","SHP2","RGTS"],
   "Adi Nath": ["ADI-SCSD","ADI-RDSET","ADI-PTPFIL","ADI-PFIL","ADI-PPRPOL","ADI-PTPSET","ADI-SET","ADI-PPOL","ADI-PTPPOL","ADI-HOLD","ADI-JBOUT"],
   "Others": ["Others"],
 };
@@ -146,6 +150,7 @@ export function parseWorkbook(arrayBuffer) {
   header.forEach((h, i) => { if (h) stageIdx[h] = i; });
   const stageColsPresent = (list) => list.map((n) => stageIdx[n]).filter((i) => i != null && i >= 0);
   const castIdx = stageColsPresent(CAST_STAGES);
+  const fgIdx = stageColsPresent(FG_STAGES);
   const macroIdx = {};
   for (const [k, list] of Object.entries(MACRO)) macroIdx[k] = stageColsPresent(list);
 
@@ -171,6 +176,9 @@ export function parseWorkbook(arrayBuffer) {
     for (const ci of castIdx) cp += toNum(row[ci]);
     const cw = Math.round(unitWt * cp * 100) / 100;
 
+    let fg = 0;
+    for (const ci of fgIdx) fg += toNum(row[ci]);
+
     let phase = "Not on floor", best = 0;
     for (const [name, idxs] of Object.entries(macroIdx)) {
       let s = 0; for (const ci of idxs) s += toNum(row[ci]);
@@ -193,6 +201,7 @@ export function parseWorkbook(arrayBuffer) {
       fq: col.floorQty >= 0 ? Math.round(toNum(row[col.floorQty])) : 0,
       cp: Math.round(cp),
       cw,
+      fg: Math.round(fg),
       d: col.balDays >= 0 && row[col.balDays] != null && row[col.balDays] !== "" ? Math.round(toNum(row[col.balDays])) : null,
       ph: phase,
       mw: Math.round(bq * unitWt * 10) / 10,
