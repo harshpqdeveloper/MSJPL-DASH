@@ -457,7 +457,7 @@ export default function Dashboard({ rows: ROWS, meta, fileName, onRefresh }) {
                 </div>
               </div>
               <div style={{ fontSize:11, color:C.faint, marginTop:12 }}>
-                Casting pcs = cols AE:AM (AN). Casting weight = unit weight (Z) × AN (AO). Month = production delivery date; July split at the 15th.
+                Casting pcs = cols AE:AM (AN). Casting weight = unit weight (Z) × AN (AO). Month = production delivery date.
                 Metal derived from Karat (col S): contains G → Gold, P → Platinum, S → Silver.
               </div>
             </Panel>

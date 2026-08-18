@@ -6,7 +6,7 @@ import * as XLSX from "xlsx";
 //   Casting wt  (col AO) = UnitWeight (col Z) x Casting pcs
 //   Metal  = derived ONLY from Karat (col S):
 //            contains G/g -> Gold, else P/p -> Platinum, else S/s -> Silver
-//   Month  = production delivery date (Prd Delv Dt, col L); July split at the 15th
+//   Month  = production delivery date (Prd Delv Dt, col L)
 //   Phase  = the macro production stage holding the most balance pieces
 // Header row is auto-detected. Dates are converted via UTC to avoid the
 // SheetJS/timezone bug that reads Excel dates one day early.
@@ -75,11 +75,7 @@ function metalFromKarat(k) {
 
 function monthBucket(d) {
   if (!d) return { mb: "No date", ms: Number.POSITIVE_INFINITY };
-  const y = d.getFullYear(), m = d.getMonth() + 1, day = d.getDate();
-  if (m === 7) {
-    const half = day <= 15 ? " (1-15)" : " (16-31)";
-    return { mb: `Jul ${y}${half}`, ms: y * 100 + 7 + (day <= 15 ? 0.1 : 0.2) };
-  }
+  const y = d.getFullYear(), m = d.getMonth() + 1;
   return { mb: `${MONTH_SHORT[m - 1]} ${y}`, ms: y * 100 + m };
 }
 
