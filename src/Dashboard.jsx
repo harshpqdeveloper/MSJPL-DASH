@@ -465,7 +465,7 @@ export default function Dashboard({ rows: ROWS, meta, fileName, onRefresh }) {
               </div>
             </Panel>
 
-            <Panel title="By quantity" hint="balance · casting pcs · casting weight" style={{ marginBottom:20 }} delay={180}>
+            <Panel title="Balance quantity" hint="balance · casting pcs · casting weight" style={{ marginBottom:20 }} delay={180}>
               <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:24 }}>
                 {[["Balance qty","bal",(v)=>fmt(v)],["Casting pcs","cp",(v)=>fmt(v)],["Casting weight (g)","cw",(v)=>fmt2(v)]].map(([lab, key, f]) => {
                   const total = byMetal.reduce((s, x) => s + x[key], 0);
