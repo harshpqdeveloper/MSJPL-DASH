@@ -10,7 +10,7 @@ import {
 } from "./icons.jsx";
 import { loadUiSession, saveUiSession } from "./sessionPersistence.js";
 
-const FUNNEL = ["Order booked","Design / Wax","Tree / Casting","Filing / Pre-polish","Stone Setting","Polishing","Rhodium / Plating","Quality Check","Rework / Hold","Reject"];
+const FUNNEL = ["New Order","Model Pending","Wax","PWBGD","Filing","Finding Balance","Single Pre Polish","Setting","MSHDS","Polish","Rodium","PQC","Third Party QC","Sampling","Job Work","GSI","FG"];
 const METALS = ["Gold","Silver","Platinum","Other"];
 // Literal hex (not CSS-var strings) — these feed both plain style backgrounds and
 // hex+alpha-suffix tints (e.g. `${METALC[x]}1f`), which only work with real hex values.
@@ -232,7 +232,7 @@ export default function Dashboard({ rows: ROWS, meta, fileName, onRefresh }) {
     return FUNNEL.filter((p) => m[p] > 0).map((p) => ({ name:p, qty:m[p] })); }, [rows]);
   const maxPhase = Math.max(...phase.map((p) => p.qty), 1);
   const phaseTotal = useMemo(() => phase.reduce((s, p) => s + p.qty, 0), [phase]);
-  const bottleneck = phase.filter((p) => p.name !== "Order booked").reduce((a, b) => (b.qty > (a?.qty || 0) ? b : a), null);
+  const bottleneck = phase.filter((p) => p.name !== "New Order").reduce((a, b) => (b.qty > (a?.qty || 0) ? b : a), null);
 
   const byCustomer = useMemo(() => { const base = ROWS.filter((r) => (cat === "All" || r.cat === cat) && (metal === "All" || metalOf(r) === metal));
     const m = {}; base.forEach((r) => { m[r.c] = (m[r.c] || 0) + r.bq; });
@@ -500,7 +500,7 @@ export default function Dashboard({ rows: ROWS, meta, fileName, onRefresh }) {
               }
             >
               <div style={{ display:"flex", flexDirection:"column", gap:9 }}>
-                {phase.map((p) => { const isB = bottleneck && p.name === bottleneck.name; const isStart = p.name === "Order booked";
+                {phase.map((p) => { const isB = bottleneck && p.name === bottleneck.name; const isStart = p.name === "New Order";
                   return (<div key={p.name}>
                     <div style={{ display:"flex", justifyContent:"space-between", fontSize:12, marginBottom:4 }}>
                       <span style={{ color:isB ? "var(--danger-dk)" : C.text, display:"flex", alignItems:"center", gap:6, fontWeight:isB?700:400 }}>

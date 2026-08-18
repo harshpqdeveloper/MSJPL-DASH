@@ -14,19 +14,28 @@ import * as XLSX from "xlsx";
 
 const CAST_STAGES = ["SO","PMDR","PWAX-A","PWAX-B","PWAX","PWXST","PWBGD","PWBGD-LGD","PTRI"];
 
+// Custom production-funnel grouping (per-column mapping supplied manually).
+// Columns not yet assigned to a group (JTRI, PTRI, casting Pcs/Casting wts, PREJ,
+// SHP4, and everything from ADI-SCSD onward) are intentionally left out for now —
+// rows whose peak stage falls in one of those columns fall back to "Not on floor".
 const MACRO = {
-  "Order booked": ["SO"],
-  "Design / Wax": ["PMDR","PWAX-A","PWAX-B","PWAX","PWXST","PWBGD","PWBGD-LGD"],
-  "Tree / Casting": ["PTRI","PCAST","JCAST"],
-  "Filing / Pre-polish": ["PTMLG","PSPGR","PGPG","PFIL-B","P1SFIL","P1FNDBL","PPRPOL"],
-  "Stone Setting": ["PSET","PMSET-C","PMSET-A","MSHDSET","ADI-PTPSET","ADI-SET"],
-  "Polishing": ["PPOLCL-1","PPOLCL-2","PPOLCL-3","PPOLCL-4","PPOLCL-5","PPOL","ADI-PPOL","ADI-PTPPOL","ADI-PPRPOL","ADI-PTPFIL","ADI-PFIL","S1FIL","ADI-SCSD"],
-  "Rhodium / Plating": ["JRHD","PRHD","PPLT"],
-  "Quality Check": ["PQC","PTPQC","PTPQC-A"],
-  "Rework / Hold": ["PJBW","ADI-HOLD","ADI-JBOUT","RGTS","PCELL"],
-  "Reject": ["PREJ","GSI-REJ"],
-  "Finished / Shipped": ["FG","SHP1","SHP2","SHP3","SHP4","Sale","Closed"],
-  "Uncategorised": ["Others"],
+  "New Order": ["SO"],
+  "Model Pending": ["PMDR"],
+  "Wax": ["PWAX-A","PWAX-B","PWAX","PWXST"],
+  "PWBGD": ["PWBGD","PWBGD-LGD"],
+  "Filing": ["PCAST","JCAST","JSPGR","JTMLG","PTMLG","PSPGR","PGPG","PFIL-B","PFIL-D","JFIL","P1SFIL"],
+  "Finding Balance": ["P1FNDBL"],
+  "Single Pre Polish": ["PPRPOL"],
+  "Setting": ["PSET","JSET","JSHDSET","PMSET-C","PMSET","PMSET-A","PMSET-B"],
+  "MSHDS": ["MSHDSET"],
+  "Polish": ["PPOLCL-1","PPOLCL-2","PPOLCL-3","PPOLCL-4","PPOL","JPRPOL","JPOL","PPOLCL-5"],
+  "Rodium": ["JRHD","PRHD","PRHD-A"],
+  "PQC": ["PQC"],
+  "Third Party QC": ["PTPQC","PTPQC-A","JTPQC"],
+  "Sampling": ["S1FIL","S1MSET","S1POL","S2FIL","S2SET","S2POL","S2FQC"],
+  "Job Work": ["PJBW","PJBW-A","PPLT","GSI-REJ"],
+  "GSI": ["PCELL","SHP3"],
+  "FG": ["FG","SHP1","SHP2","RGTS"],
 };
 
 const CATNAME = { RNG:"Rings", EAR:"Earrings", BRC:"Bracelets", PND:"Pendants", NCK:"Necklaces", BNG:"Bangles" };
