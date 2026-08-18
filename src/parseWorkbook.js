@@ -15,14 +15,16 @@ import * as XLSX from "xlsx";
 const CAST_STAGES = ["SO","PMDR","PWAX-A","PWAX-B","PWAX","PWXST","PWBGD","PWBGD-LGD","PTRI"];
 
 // Custom production-funnel grouping (per-column mapping supplied manually).
-// Columns not yet assigned to a group (JTRI, PTRI, casting Pcs/Casting wts, PREJ,
-// Sale, Closed) are intentionally left out for now — rows whose peak stage falls
-// in one of those columns fall back to "Not on floor".
+// Columns not yet assigned to a group (casting Pcs/Casting wts pre-computed columns,
+// PREJ, Sale, Closed) are intentionally left out for now — rows whose peak stage
+// falls in one of those columns fall back to "Not on floor".
 const MACRO = {
   "New Order": ["SO"],
   "Model Pending": ["PMDR"],
   "Wax": ["PWAX-A","PWAX-B","PWAX","PWXST"],
   "PWBGD": ["PWBGD","PWBGD-LGD"],
+  "JTRI": ["JTRI"],
+  "PTRI": ["PTRI"],
   "Filing": ["PCAST","JCAST","JSPGR","JTMLG","PTMLG","PSPGR","PGPG","PFIL-B","PFIL-D","JFIL","P1SFIL"],
   "Finding Balance": ["P1FNDBL"],
   "Single Pre Polish": ["PPRPOL"],
