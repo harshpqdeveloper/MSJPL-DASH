@@ -7,6 +7,7 @@
 // small, frequently-changing UI state a user builds up while browsing.
 
 const UI_KEY = "jd:session:v1:ui";
+const SKIP_INTRO_KEY = "jd:session:v1:skip-intro";
 
 function safeParse(json) {
   try {
@@ -35,5 +36,25 @@ export function saveUiSession(state) {
     sessionStorage.setItem(UI_KEY, JSON.stringify(state));
   } catch (e) {
     console.warn("Dashboard UI state could not be saved.", e);
+  }
+}
+
+/** Marks the next page load (this tab only) to skip the intro animation — set right before a manual reload. */
+export function markIntroSkip() {
+  try {
+    sessionStorage.setItem(SKIP_INTRO_KEY, "1");
+  } catch {
+    // sessionStorage unavailable — the intro will just play again, which is harmless
+  }
+}
+
+/** Reads and clears the skip-intro flag. True only for the one page load right after markIntroSkip(). */
+export function consumeIntroSkip() {
+  try {
+    const skip = sessionStorage.getItem(SKIP_INTRO_KEY) === "1";
+    if (skip) sessionStorage.removeItem(SKIP_INTRO_KEY);
+    return skip;
+  } catch {
+    return false;
   }
 }

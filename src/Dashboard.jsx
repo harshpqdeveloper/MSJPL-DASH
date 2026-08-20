@@ -8,7 +8,7 @@ import {
   IconMenu, IconChevronLeft, IconGrid, IconUser, IconGem,
   IconLayers, IconTrendingUp, IconShieldCheck,
 } from "./icons.jsx";
-import { loadUiSession, saveUiSession } from "./sessionPersistence.js";
+import { loadUiSession, saveUiSession, markIntroSkip } from "./sessionPersistence.js";
 
 const FUNNEL = ["New Order","Model Pending","Wax","PWBGD","JTRI","PTRI","Filing","Finding Balance","Single Pre Polish","Setting","MSHDS","Polish","Rodium","PQC","Third Party QC","Sampling","Job Work","GSI","FG","Adi Nath","Others"];
 const METALS = ["Gold","Silver","Platinum","Other"];
@@ -355,6 +355,10 @@ export default function Dashboard({ rows: ROWS, meta, fileName, onRefresh }) {
             </div>
 
             <div style={{ display:"flex", alignItems:"center", gap:9, flexWrap:"wrap" }}>
+              <button type="button" className="btn btn-icon" onClick={() => { markIntroSkip(); window.location.reload(); }} aria-label="Refresh data" title="Refresh data">
+                <IconRefresh width={16} height={16} />
+              </button>
+
               <PopoverButton icon={<IconSettings width={16} height={16} />} label="File details" panelTitle="File details">
                 {[["Sheet", meta.sheetName], ["Header row", meta.headerRow], ["Order lines", fmt(ROWS.length)], ["Snapshot date", meta.asOf || "—"]].map(([k2, v]) => (
                   <div key={k2} style={{ display:"flex", justifyContent:"space-between", fontSize:12.5, padding:"5px 0", borderBottom:"1px solid var(--line-soft)" }}>
