@@ -229,17 +229,18 @@ export default function Dashboard({ rows: ROWS, meta, fileName, onRefresh }) {
     return METALS.filter((me) => m[me]).map((me) => ({ name:me, ...m[me], fill:METALC[me] })); }, [rows]);
 
   const phase = useMemo(() => { const m = {}; rows.forEach((r) => { if (FUNNEL.includes(r.ph)) m[r.ph] = (m[r.ph] || 0) + r.bq; });
-    // FG is a direct sum of its own columns (like Casting Pcs), not gated by the "peak stage" logic above.
-    m["FG"] = rows.reduce((s, r) => s + r.fg, 0);
     return FUNNEL.filter((p) => m[p] > 0).map((p) => ({ name:p, qty:m[p] })); }, [rows]);
   const maxPhase = Math.max(...phase.map((p) => p.qty), 1);
   const phaseTotal = useMemo(() => phase.reduce((s, p) => s + p.qty, 0), [phase]);
   const bottleneck = phase.filter((p) => p.name !== "New Order").reduce((a, b) => (b.qty > (a?.qty || 0) ? b : a), null);
 
-  const byCustomer = useMemo(() => { const base = ROWS.filter((r) => (cat === "All" || r.cat === cat) && (metal === "All" || metalOf(r) === metal));
-    const m = {}; base.forEach((r) => { m[r.c] = (m[r.c] || 0) + r.bq; });
+  // Grouped by Party (col A) — this file has no separate "Customer" column (only
+  // "Party" and "Sub Customer"), so r.c is always blank and would collapse every
+  // row into a single bucket.
+  const byParty = useMemo(() => { const base = ROWS.filter((r) => (cat === "All" || r.cat === cat) && (metal === "All" || metalOf(r) === metal));
+    const m = {}; base.forEach((r) => { m[r.p] = (m[r.p] || 0) + r.bq; });
     return Object.entries(m).map(([name, bq]) => ({ name, bq })).sort((a, b) => b.bq - a.bq); }, [ROWS, cat, metal]);
-  const byCustomerTotal = useMemo(() => byCustomer.reduce((s, c) => s + c.bq, 0), [byCustomer]);
+  const byPartyTotal = useMemo(() => byParty.reduce((s, c) => s + c.bq, 0), [byParty]);
 
   const byCat = useMemo(() => { const m = {}; rows.forEach((r) => (m[r.cat] = (m[r.cat] || 0) + r.bq));
     return Object.entries(m).map(([name, qty]) => ({ name, qty })).sort((a, b) => b.qty - a.qty); }, [rows]);
@@ -528,15 +529,15 @@ export default function Dashboard({ rows: ROWS, meta, fileName, onRefresh }) {
 
           {/* ---------- Party & mix ---------- */}
           <div ref={sectionRefs.partymix} className="grid2" style={{ marginBottom:20 }}>
-            <Panel title="Balance by customer" hint="all customers by balance qty" delay={260}
+            <Panel title="Balance by party" hint="all parties by balance qty" delay={260}
               right={
                 <span style={{ fontSize:11.5, color:C.mut, background:"var(--panel-2)", border:`1px solid ${C.line}`, borderRadius:999, padding:"5px 12px", fontVariantNumeric:"tabular-nums" }}>
-                  Total: <b style={{ color:C.text, fontWeight:800 }}>{fmt(byCustomerTotal)}</b> pcs
+                  Total: <b style={{ color:C.text, fontWeight:800 }}>{fmt(byPartyTotal)}</b> pcs
                 </span>
               }
             >
-              <ResponsiveContainer width="100%" height={Math.max(280, byCustomer.length * 28)}>
-                <BarChart data={byCustomer} layout="vertical" margin={{ top:4, right:56, left:8, bottom:0 }}>
+              <ResponsiveContainer width="100%" height={Math.max(280, byParty.length * 28)}>
+                <BarChart data={byParty} layout="vertical" margin={{ top:4, right:56, left:8, bottom:0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={CH.line} horizontal={false} />
                   <XAxis type="number" tick={{ fill:CH.faint, fontSize:11 }} axisLine={false} tickLine={false} />
                   <YAxis type="category" dataKey="name" tick={{ fill:CH.mut, fontSize:11 }} axisLine={false} tickLine={false} width={104} />

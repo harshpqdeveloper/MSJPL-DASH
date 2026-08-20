@@ -12,17 +12,18 @@ import * as XLSX from "xlsx";
 // SheetJS/timezone bug that reads Excel dates one day early.
 // ---------------------------------------------------------------------------
 
+// Dashboard shows only order lines whose Prd Delv Dt falls in this year — the same
+// column already driving month buckets, due dates and the casting plan grouping
+// (see KPI_DOCUMENTATION.md). Change this single constant to show a different year.
+const TARGET_YEAR = 2026;
+
 const CAST_STAGES = ["SO","PMDR","PWAX-A","PWAX-B","PWAX","PWXST","PWBGD","PWBGD-LGD","PTRI"];
 
-// FG is reported as a direct sum of its own columns (like Casting Pcs), not via the
-// "peak stage wins" logic the rest of the funnel uses — see the `fg` field below and
-// how it's combined into the funnel in Dashboard.jsx's `phase` useMemo.
-const FG_STAGES = ["FG","SHP1","SHP2","RGTS"];
-
 // Custom production-funnel grouping (per-column mapping supplied manually).
-// Columns not yet assigned to a group (casting Pcs/Casting wts pre-computed columns,
-// PREJ, Sale, Closed) are intentionally left out for now — rows whose peak stage
-// falls in one of those columns fall back to "Not on floor".
+// The only columns left out are the pre-computed casting Pcs/Casting wts columns
+// (already reflected via CAST_STAGES elsewhere) — every other stage column, including
+// PREJ/Sale/Closed (folded into "Others"), is mapped so no row falls through to
+// "Not on floor" and the funnel total matches Bal Qty summed across all rows.
 const MACRO = {
   "New Order": ["SO"],
   "Model Pending": ["PMDR"],
@@ -42,8 +43,9 @@ const MACRO = {
   "Sampling": ["S1FIL","S1MSET","S1POL","S2FIL","S2SET","S2POL","S2FQC"],
   "Job Work": ["PJBW","PJBW-A","PPLT","GSI-REJ"],
   "GSI": ["PCELL","SHP3"],
+  "FG": ["FG","SHP1","SHP2","RGTS"],
   "Adi Nath": ["ADI-SCSD","ADI-RDSET","ADI-PTPFIL","ADI-PFIL","ADI-PPRPOL","ADI-PTPSET","ADI-SET","ADI-PPOL","ADI-PTPPOL","ADI-HOLD","ADI-JBOUT"],
-  "Others": ["Others"],
+  "Others": ["Others","PREJ","Sale","Closed"],
 };
 
 const CATNAME = { RNG:"Rings", EAR:"Earrings", BRC:"Bracelets", PND:"Pendants", NCK:"Necklaces", BNG:"Bangles" };
@@ -73,8 +75,18 @@ function toDate(v) {
     return new Date(t.getFullYear(), t.getMonth(), t.getDate());
   }
   const s = String(v).trim();
-  const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); // 2026-08-18[T10:30:25]
   if (iso) return new Date(+iso[1], +iso[2] - 1, +iso[3]);
+  // Day-first "DD/MM/YYYY" or "DD-MM-YYYY", optionally followed by a time (e.g. 18/08/2026 10:30:25).
+  // JS's generic Date parser treats slash dates as MM/DD/YYYY (US order), which silently misreads
+  // day-first exports, so this is matched explicitly before falling back to new Date(s).
+  const dmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})(?:[\sT]|$)/);
+  if (dmy) {
+    let [, dd, mm, yy] = dmy;
+    dd = +dd; mm = +mm; yy = +yy;
+    if (yy < 100) yy += yy < 70 ? 2000 : 1900;
+    if (mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31) return new Date(yy, mm - 1, dd);
+  }
   const d = new Date(s);
   return isNaN(d) ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
@@ -150,23 +162,28 @@ export function parseWorkbook(arrayBuffer) {
   header.forEach((h, i) => { if (h) stageIdx[h] = i; });
   const stageColsPresent = (list) => list.map((n) => stageIdx[n]).filter((i) => i != null && i >= 0);
   const castIdx = stageColsPresent(CAST_STAGES);
-  const fgIdx = stageColsPresent(FG_STAGES);
   const macroIdx = {};
   for (const [k, list] of Object.entries(MACRO)) macroIdx[k] = stageColsPresent(list);
+
+  if (col.delv < 0) throw new Error("Prd Delv Dt column could not be found in the Jemmy Excel file.");
 
   const missing = [];
   if (col.srno < 0) missing.push("Order SrNo");
   if (col.balQty < 0) missing.push("Bal Qty");
   if (col.karat < 0) missing.push("Karat");
-  if (col.delv < 0) missing.push("Prd Delv Dt");
   if (col.unitWt < 0) missing.push("Unit Metal PureWt / UnitWeight");
   if (castIdx.length === 0) missing.push("Casting stages (SO..PTRI)");
 
   const rows = [];
+  let linesAnyYear = 0;
   for (let r = hIdx + 1; r < aoa.length; r++) {
     const row = aoa[r] || [];
     const sr = norm(col.srno >= 0 ? row[col.srno] : "");
     if (!sr) continue;
+    linesAnyYear++;
+
+    const dDate = col.delv >= 0 ? toDate(row[col.delv]) : null;
+    if (!dDate || dDate.getFullYear() !== TARGET_YEAR) continue; // outside the target year
 
     const karat = col.karat >= 0 ? norm(row[col.karat]) : "";
     const unitWt = col.unitWt >= 0 ? toNum(row[col.unitWt]) : 0;
@@ -176,16 +193,12 @@ export function parseWorkbook(arrayBuffer) {
     for (const ci of castIdx) cp += toNum(row[ci]);
     const cw = Math.round(unitWt * cp * 100) / 100;
 
-    let fg = 0;
-    for (const ci of fgIdx) fg += toNum(row[ci]);
-
     let phase = "Not on floor", best = 0;
     for (const [name, idxs] of Object.entries(macroIdx)) {
       let s = 0; for (const ci of idxs) s += toNum(row[ci]);
       if (s > best) { best = s; phase = name; }
     }
 
-    const dDate = col.delv >= 0 ? toDate(row[col.delv]) : null;
     const { mb, ms } = monthBucket(dDate);
     const catRaw = col.category >= 0 ? norm(row[col.category]) : "";
 
@@ -201,7 +214,6 @@ export function parseWorkbook(arrayBuffer) {
       fq: col.floorQty >= 0 ? Math.round(toNum(row[col.floorQty])) : 0,
       cp: Math.round(cp),
       cw,
-      fg: Math.round(fg),
       d: col.balDays >= 0 && row[col.balDays] != null && row[col.balDays] !== "" ? Math.round(toNum(row[col.balDays])) : null,
       ph: phase,
       mw: Math.round(bq * unitWt * 10) / 10,
@@ -213,15 +225,22 @@ export function parseWorkbook(arrayBuffer) {
     });
   }
 
-  if (!rows.length) throw new Error("No order lines found (no rows with an Order SrNo below the header).");
+  if (!rows.length) {
+    if (linesAnyYear > 0) {
+      throw new Error(`No order lines found for ${TARGET_YEAR} (the file has ${linesAnyYear} lines, but none with a Prd Delv Dt in ${TARGET_YEAR}).`);
+    }
+    throw new Error("No order lines found (no rows with an Order SrNo below the header).");
+  }
 
   // Snapshot ("as of") date: BalDelvDays is measured from the date the report was pulled,
-  // so  asOf = Prd Delv Dt - BalDelvDays.  Take the most common value across all lines.
+  // so  asOf = Prd Delv Dt - BalDelvDays.  Take the most common value across all lines
+  // within the target year (matches the rows actually shown on the dashboard).
   const tally = {};
   for (let r = hIdx + 1; r < aoa.length; r++) {
     const row = aoa[r] || [];
     if (!norm(col.srno >= 0 ? row[col.srno] : "")) continue;
     const dd = col.delv >= 0 ? toDate(row[col.delv]) : null;
+    if (!dd || dd.getFullYear() !== TARGET_YEAR) continue;
     const bdv = col.balDays >= 0 ? row[col.balDays] : null;
     if (!dd || bdv == null || bdv === "") continue;
     const ref = new Date(dd.getFullYear(), dd.getMonth(), dd.getDate() - Math.round(toNum(bdv)));
@@ -232,6 +251,8 @@ export function parseWorkbook(arrayBuffer) {
   for (const [k2, n2] of Object.entries(tally)) if (n2 > bestN) { bestN = n2; asOf = k2; }
 
   const meta = { sheetName, headerRow: hIdx + 1, totalLines: rows.length,
-    castingStagesFound: castIdx.length, asOf, asOfLines: bestN, missing };
+    castingStagesFound: castIdx.length, asOf, asOfLines: bestN, missing,
+    dateColumn: "Prd Delv Dt", targetYear: TARGET_YEAR,
+    linesAnyYear, linesIgnored: linesAnyYear - rows.length };
   return { rows, meta };
 }
