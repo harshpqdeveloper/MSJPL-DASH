@@ -8,7 +8,7 @@ import {
   IconMenu, IconChevronLeft, IconGrid, IconUser, IconGem,
   IconLayers, IconTrendingUp, IconShieldCheck,
 } from "./icons.jsx";
-import { loadUiSession, saveUiSession, markIntroSkip } from "./sessionPersistence.js";
+import { loadUiSession, saveUiSession } from "./sessionPersistence.js";
 
 const FUNNEL = ["New Order","Model Pending","Wax","PWBGD","JTRI","PTRI","Filing","Finding Balance","Single Pre Polish","Setting","MSHDS","Polish","Rodium","PQC","Third Party QC","Sampling","Job Work","GSI","FG","Adi Nath","Others"];
 const METALS = ["Gold","Silver","Platinum","Other"];
@@ -173,6 +173,12 @@ export default function Dashboard({ rows: ROWS, meta, fileName, onRefresh }) {
   // Restored once per mount (e.g. after a page refresh); filters/sidebar state persists
   // independently of which Excel file is currently loaded.
   const [savedUi] = useState(() => loadUiSession() || {});
+
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try { await onRefresh(); } finally { setRefreshing(false); }
+  };
 
   const [party, setParty] = useState(savedUi.party ?? "All");
   const [cat, setCat] = useState(savedUi.cat ?? "All");
@@ -355,8 +361,8 @@ export default function Dashboard({ rows: ROWS, meta, fileName, onRefresh }) {
             </div>
 
             <div style={{ display:"flex", alignItems:"center", gap:9, flexWrap:"wrap" }}>
-              <button type="button" className="btn btn-icon" onClick={() => { markIntroSkip(); window.location.reload(); }} aria-label="Refresh data" title="Refresh data">
-                <IconRefresh width={16} height={16} />
+              <button type="button" className="btn btn-icon" onClick={handleRefresh} disabled={refreshing} aria-label="Refresh data" title="Refresh data">
+                <IconRefresh width={16} height={16} style={refreshing ? { animation:"spin .8s linear infinite" } : undefined} />
               </button>
 
               <PopoverButton icon={<IconSettings width={16} height={16} />} label="File details" panelTitle="File details">

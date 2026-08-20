@@ -6,7 +6,6 @@ import MSJPLIntro from "./MSJPLIntro.jsx";
 import logo from "./assets/logo.png";
 import { C, GLOBAL_CSS } from "./theme.js";
 import { IconFileWarning, IconInbox } from "./icons.jsx";
-import { consumeIntroSkip } from "./sessionPersistence.js";
 
 // How often to re-check the excel/ folder for a new or updated file once the
 // dashboard is up. Cheap: it's just a small JSON status fetch unless the file
@@ -18,7 +17,7 @@ export default function App() {
   const [fileName, setFileName] = useState("");
   const [status, setStatus] = useState("loading"); // loading | ready | not-found | error
   const [error, setError] = useState("");
-  const [introDone, setIntroDone] = useState(consumeIntroSkip);
+  const [introDone, setIntroDone] = useState(false);
   const signatureRef = useRef(""); // `${fileName}:${mtimeMs}` of the currently-loaded file
 
   const loadLatest = useCallback(async () => {
