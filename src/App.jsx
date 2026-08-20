@@ -51,6 +51,15 @@ export default function App() {
       const buf = await fileRes.arrayBuffer();
       const parsed = parseWorkbook(buf);
 
+      // eslint-disable-next-line no-console -- intentional: console-only verification, not shown in the UI
+      console.info(
+        `[Jemmy] Detected Excel file: ${metaJson.fileName}\n` +
+        `[Jemmy] Total rows (with Order SrNo): ${parsed.meta.linesAnyYear}\n` +
+        `[Jemmy] Date column used for year filter: ${parsed.meta.dateColumn}\n` +
+        `[Jemmy] ${parsed.meta.targetYear} rows: ${parsed.meta.totalLines}\n` +
+        `[Jemmy] Ignored non-${parsed.meta.targetYear} rows: ${parsed.meta.linesIgnored}`
+      );
+
       signatureRef.current = signature;
       setData(parsed); setFileName(metaJson.fileName); setError("");
       setStatus("ready");
