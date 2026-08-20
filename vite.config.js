@@ -7,6 +7,10 @@ import { excelFolderPlugin } from "./vite-excel-plugin.js";
 export default defineConfig({
   plugins: [react(), excelFolderPlugin()],
   base: "./",
-  server: { host: true, port: 5173 },
+  // excel/ is read directly by excelFolderPlugin on each request, not via HMR, so it
+  // doesn't need to be watched. Watching it is actively harmful: Excel drops short-lived
+  // temp files there while saving (e.g. a random-named lock file with no extension), and
+  // an EBUSY error on one of those crashes the whole dev server's file watcher.
+  server: { host: true, port: 5173, watch: { ignored: ["**/excel/**"] } },
   preview: { host: true, port: 8080 },
 });

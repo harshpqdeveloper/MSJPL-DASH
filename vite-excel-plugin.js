@@ -9,8 +9,7 @@
 // "Latest" = most recent file mtime among .xlsx/.xls files directly inside /excel.
 // The same logic backs the production deployment as Vercel serverless functions —
 // see api/excel/meta.js, api/excel/file.js, and lib/excelFile.js.
-import path from "node:path";
-import { handleExcelMeta, handleExcelFile } from "./lib/excelFile.js";
+import { handleExcelMeta, handleExcelFile, resolveExcelDir } from "./lib/excelFile.js";
 
 function createMiddleware(excelDir) {
   return function excelFolderMiddleware(req, res, next) {
@@ -25,7 +24,7 @@ export function excelFolderPlugin() {
   return {
     name: "excel-folder-server",
     configResolved(config) {
-      excelDir = path.resolve(config.root, "excel");
+      excelDir = resolveExcelDir(config.root);
     },
     configureServer(server) {
       server.middlewares.use(createMiddleware(excelDir));

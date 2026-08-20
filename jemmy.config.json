@@ -1,0 +1,4 @@
+{
+  "_comment": "Folder the dashboard reads the latest Jemmy Excel export from. Set to an absolute path (e.g. D:\\JemmyData) to point at a folder outside this project, or leave as 'excel' to keep using the folder bundled with the project. You can also set this via the JEMMY_DATA_FOLDER environment variable instead, which takes priority over this file. Restart 'npm run dev' / 'npm run preview' after changing this.",
+  "dataFolder": "excel"
+}
