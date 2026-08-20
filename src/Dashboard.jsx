@@ -346,10 +346,11 @@ export default function Dashboard({ rows: ROWS, meta, fileName, onRefresh }) {
                 <h1 style={{ margin:0, fontFamily:"'Fraunces',serif", fontWeight:700, fontSize:"clamp(16px,4.5vw,21px)", color:C.text, letterSpacing:"-.01em", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
                   Production &amp; Casting Dashboard
                 </h1>
-                <div style={{ fontSize:12, color:C.mut, marginTop:2, wordBreak:"break-word" }}>
-                  {fileName ? `File: ${fileName}` : "Full pipeline + monthly casting by quantity"}
-                  {meta.asOf && <span style={{ marginLeft:9, color:"var(--primary-dk)", fontWeight:700 }}>· Data as of {meta.asOf}</span>}
-                </div>
+                {meta.asOf && (
+                  <div style={{ fontSize:12, color:C.mut, marginTop:2, wordBreak:"break-word" }}>
+                    <span style={{ color:"var(--primary-dk)", fontWeight:700 }}>Data as of {meta.asOf}</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -576,14 +577,6 @@ export default function Dashboard({ rows: ROWS, meta, fileName, onRefresh }) {
                 </div>
               </div>
             </Panel>
-          </div>
-
-          <div style={{ marginTop:20, fontSize:11, color:C.faint, lineHeight:1.6 }}>
-            Sheet <b style={{ color:C.mut }}>{meta.sheetName}</b> · header row {meta.headerRow} · {fmt(ROWS.length)} order lines
-            {meta.asOf && <> · snapshot date <b style={{ color:C.mut }}>{meta.asOf}</b> (derived as delivery date − BalDelvDays)</>}.
-            Export Quantity = Bal Qty (col Z). Metal is derived from the Karat code (col S): a value containing G → Gold, P → Platinum, S → Silver.
-            Casting pcs = cols AE:AM (AN); casting weight = unit weight (Z) × AN (AO).
-            {meta.missing.length > 0 && <span style={{ color:"var(--warning-dk)", fontWeight:600 }}> · Missing columns: {meta.missing.join(", ")}.</span>}
           </div>
         </div>
       </div>
