@@ -24,7 +24,7 @@ const CAST_STAGES = ["SO","PMDR","PWAX-A","PWAX-B","PWAX","PWXST","PWBGD","PWBGD
 // read from the source workbook's own totals row (the row directly above the stage
 // codes), matched by code name — not summed from individual order lines. See
 // buildFunnel() below for the matching logic.
-// NOTE: "Rodhium" is matched against "JRHD" (the sheet's actual column name) — the
+// NOTE: "Rhodium" is matched against "JRHD" (the sheet's actual column name) — the
 // originally supplied code list said "JRH", which doesn't exist as a column.
 const FUNNEL_MAPPING = [
   { name: "New Order", codes: ["SO"] },
@@ -39,7 +39,7 @@ const FUNNEL_MAPPING = [
   { name: "Setting", codes: ["PSET","JSET","JSHDSET","PMSET-C","PMSET","PMSET-A","PMSET-B"] },
   { name: "MSHDSET", codes: ["MSHDSET"] },
   { name: "Polish", codes: ["PPOLCL-1","PPOLCL-2","PPOLCL-3","PPOLCL-4","PPOL","JPRPOL","JPOL","PPOLCL-5"] },
-  { name: "Rodhium", codes: ["JRHD","PRHD","PRHD-A"] },
+  { name: "Rhodium", codes: ["JRHD","PRHD","PRHD-A"] },
   { name: "Final QC", codes: ["PQC"] },
   { name: "Third Party QC", codes: ["PTPQC","PTPQC-A","JTPQC","SHP1"] },
   { name: "Sampling", codes: ["S1FIL","S1MSET","S1POL","S2FIL","S2SET","S2POL","S2FQC","SHP2"] },
