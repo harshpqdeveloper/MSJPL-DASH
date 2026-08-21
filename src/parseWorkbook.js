@@ -7,7 +7,8 @@ import * as XLSX from "xlsx";
 //   Metal  = derived ONLY from Karat (col S):
 //            contains G/g -> Gold, else P/p -> Platinum, else S/s -> Silver
 //   Month  = production delivery date (Prd Delv Dt, col L)
-//   Phase  = the macro production stage holding the most balance pieces
+//   Production Funnel = the sheet's OWN pre-computed column totals, one row above
+//            the header row (see FUNNEL_MAPPING below), not summed from order lines.
 // Header row is auto-detected. Dates are converted via UTC to avoid the
 // SheetJS/timezone bug that reads Excel dates one day early.
 // ---------------------------------------------------------------------------
@@ -19,34 +20,39 @@ const TARGET_YEAR = 2026;
 
 const CAST_STAGES = ["SO","PMDR","PWAX-A","PWAX-B","PWAX","PWXST","PWBGD","PWBGD-LGD","PTRI"];
 
-// Custom production-funnel grouping (per-column mapping supplied manually).
-// The only columns left out are the pre-computed casting Pcs/Casting wts columns
-// (already reflected via CAST_STAGES elsewhere) — every other stage column, including
-// PREJ/Sale/Closed (folded into "Others"), is mapped so no row falls through to
-// "Not on floor" and the funnel total matches Bal Qty summed across all rows.
-const MACRO = {
-  "New Order": ["SO"],
-  "Model Pending": ["PMDR"],
-  "Wax": ["PWAX-A","PWAX-B","PWAX","PWXST"],
-  "PWBGD": ["PWBGD","PWBGD-LGD"],
-  "JTRI": ["JTRI"],
-  "PTRI": ["PTRI"],
-  "Filing": ["PCAST","JCAST","JSPGR","JTMLG","PTMLG","PSPGR","PGPG","PFIL-B","PFIL-D","JFIL","P1SFIL"],
-  "Finding Balance": ["P1FNDBL"],
-  "Single Pre Polish": ["PPRPOL"],
-  "Setting": ["PSET","JSET","JSHDSET","PMSET-C","PMSET","PMSET-A","PMSET-B"],
-  "MSHDS": ["MSHDSET"],
-  "Polish": ["PPOLCL-1","PPOLCL-2","PPOLCL-3","PPOLCL-4","PPOL","JPRPOL","JPOL","PPOLCL-5"],
-  "Rodium": ["JRHD","PRHD","PRHD-A"],
-  "PQC": ["PQC"],
-  "Third Party QC": ["PTPQC","PTPQC-A","JTPQC","SHP4"],
-  "Sampling": ["S1FIL","S1MSET","S1POL","S2FIL","S2SET","S2POL","S2FQC"],
-  "Job Work": ["PJBW","PJBW-A","PPLT","GSI-REJ"],
-  "GSI": ["PCELL","SHP3"],
-  "FG": ["FG","SHP1","SHP2","RGTS"],
-  "Adi Nath": ["ADI-SCSD","ADI-RDSET","ADI-PTPFIL","ADI-PFIL","ADI-PPRPOL","ADI-PTPSET","ADI-SET","ADI-PPOL","ADI-PTPPOL","ADI-HOLD","ADI-JBOUT"],
-  "Others": ["Others","PREJ","Sale","Closed"],
-};
+// Production Funnel mapping (per-column, supplied manually). Each header's value is
+// read from the source workbook's own totals row (the row directly above the stage
+// codes), matched by code name — not summed from individual order lines. See
+// buildFunnel() below for the matching logic.
+// NOTE: "Rodhium" is matched against "JRHD" (the sheet's actual column name) — the
+// originally supplied code list said "JRH", which doesn't exist as a column.
+const FUNNEL_MAPPING = [
+  { name: "New Order", codes: ["SO"] },
+  { name: "Model Pending", codes: ["PMDR"] },
+  { name: "Wax", codes: ["PWAX-A","PWAX-B","PWAX"] },
+  { name: "PWXST", codes: ["PWXST"] },
+  { name: "PWBGD", codes: ["PWBGD","PWBGD-LGD"] },
+  { name: "PTRI", codes: ["JTRI","PTRI"] },
+  { name: "Filing", codes: ["PCAST","JCAST","JSPGR","JTMLG","PTMLG","PSPGR","PGPG","PFIL-B","PFIL-D","JFIL","P1SFIL"] },
+  { name: "Finding Balance", codes: ["P1FNDBL"] },
+  { name: "Pre Polish", codes: ["PPRPOL"] },
+  { name: "Setting", codes: ["PSET","JSET","JSHDSET","PMSET-C","PMSET","PMSET-A","PMSET-B"] },
+  { name: "MSHDSET", codes: ["MSHDSET"] },
+  { name: "Polish", codes: ["PPOLCL-1","PPOLCL-2","PPOLCL-3","PPOLCL-4","PPOL","JPRPOL","JPOL","PPOLCL-5"] },
+  { name: "Rodhium", codes: ["JRHD","PRHD","PRHD-A"] },
+  { name: "Final QC", codes: ["PQC"] },
+  { name: "Third Party QC", codes: ["PTPQC","PTPQC-A","JTPQC","SHP1"] },
+  { name: "Sampling", codes: ["S1FIL","S1MSET","S1POL","S2FIL","S2SET","S2POL","S2FQC","SHP2"] },
+  { name: "Rejection", codes: ["PREJ"] },
+  { name: "Adi Nath", codes: ["ADI-SCSD","ADI-RDSET","ADI-PTPFIL","ADI-PFIL","ADI-PPRPOL","ADI-PTPSET","ADI-SET","ADI-PPOL","ADI-PTPPOL","ADI-HOLD","ADI-JBOUT"] },
+  { name: "Others", codes: ["Others"] },
+  { name: "Job Work", codes: ["PJBW","PJBW-A"] },
+  { name: "Ready for GSI", codes: ["PPLT","SHP4"] },
+  { name: "GSI Rejection", codes: ["GSI-REJ"] },
+  { name: "IN GSI", codes: ["PCELL","SHP3"] },
+  { name: "Finish Goods", codes: ["FG"] },
+  { name: "RGTS", codes: ["RGTS"] },
+];
 
 const CATNAME = { RNG:"Rings", EAR:"Earrings", BRC:"Bracelets", PND:"Pendants", NCK:"Necklaces", BNG:"Bangles" };
 const MONTH_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -108,6 +114,30 @@ function monthBucket(d) {
   return { mb: `${MONTH_SHORT[m - 1]} ${y}`, ms: y * 100 + m };
 }
 
+// Builds the Production Funnel values from the workbook's own totals row: `header`
+// (Row 2 — the stage codes) is matched case-insensitively, whole-string only, against
+// each mapping's code list; the matching value is read from `totalsRow` (Row 1, the
+// row immediately above) at that same column. Column position is never assumed —
+// only the header text. Multiple codes per bucket, and multiple columns sharing the
+// same code, are summed. A code with no matching column contributes 0, never throws.
+function buildFunnel(header, totalsRow) {
+  const codeToCols = {};
+  header.forEach((h, i) => {
+    const key = lc(h);
+    if (!key) return;
+    (codeToCols[key] = codeToCols[key] || []).push(i);
+  });
+
+  return FUNNEL_MAPPING.map(({ name, codes }) => {
+    let qty = 0;
+    for (const code of codes) {
+      const cols = codeToCols[lc(code)] || [];
+      for (const ci of cols) qty += toNum(totalsRow[ci]);
+    }
+    return { name, qty: Math.round(qty) };
+  });
+}
+
 function findHeaderRow(aoa) {
   for (let i = 0; i < Math.min(aoa.length, 15); i++) {
     if ((aoa[i] || []).map(lc).includes("order srno")) return i;
@@ -136,6 +166,10 @@ export function parseWorkbook(arrayBuffer) {
 
   const hIdx = findHeaderRow(aoa);
   const header = (aoa[hIdx] || []).map(norm);
+  // Row 1 (directly above the header row) holds the sheet's own pre-computed column
+  // totals — this is what the Production Funnel is built from, not the order lines.
+  const totalsRow = aoa[hIdx - 1] || [];
+  const funnel = buildFunnel(header, totalsRow);
 
   const nameToIdx = {};
   header.forEach((h, i) => { const key = h.toLowerCase(); if (key && !(key in nameToIdx)) nameToIdx[key] = i; });
@@ -162,8 +196,6 @@ export function parseWorkbook(arrayBuffer) {
   header.forEach((h, i) => { if (h) stageIdx[h] = i; });
   const stageColsPresent = (list) => list.map((n) => stageIdx[n]).filter((i) => i != null && i >= 0);
   const castIdx = stageColsPresent(CAST_STAGES);
-  const macroIdx = {};
-  for (const [k, list] of Object.entries(MACRO)) macroIdx[k] = stageColsPresent(list);
 
   if (col.delv < 0) throw new Error("Prd Delv Dt column could not be found in the Jemmy Excel file.");
 
@@ -193,12 +225,6 @@ export function parseWorkbook(arrayBuffer) {
     for (const ci of castIdx) cp += toNum(row[ci]);
     const cw = Math.round(unitWt * cp * 100) / 100;
 
-    let phase = "Not on floor", best = 0;
-    for (const [name, idxs] of Object.entries(macroIdx)) {
-      let s = 0; for (const ci of idxs) s += toNum(row[ci]);
-      if (s > best) { best = s; phase = name; }
-    }
-
     const { mb, ms } = monthBucket(dDate);
     const catRaw = col.category >= 0 ? norm(row[col.category]) : "";
 
@@ -215,7 +241,6 @@ export function parseWorkbook(arrayBuffer) {
       cp: Math.round(cp),
       cw,
       d: col.balDays >= 0 && row[col.balDays] != null && row[col.balDays] !== "" ? Math.round(toNum(row[col.balDays])) : null,
-      ph: phase,
       mw: Math.round(bq * unitWt * 10) / 10,
       mb, ms,
       ot: col.otype >= 0 ? norm(row[col.otype]) : "",
@@ -254,5 +279,5 @@ export function parseWorkbook(arrayBuffer) {
     castingStagesFound: castIdx.length, asOf, asOfLines: bestN, missing,
     dateColumn: "Prd Delv Dt", targetYear: TARGET_YEAR,
     linesAnyYear, linesIgnored: linesAnyYear - rows.length };
-  return { rows, meta };
+  return { rows, meta, funnel };
 }

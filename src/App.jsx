@@ -84,7 +84,7 @@ export default function App() {
     return (
       <>
         {intro}
-        <Dashboard rows={data.rows} meta={data.meta} fileName={fileName} onRefresh={loadLatest} />
+        <Dashboard rows={data.rows} meta={data.meta} funnel={data.funnel} fileName={fileName} onRefresh={loadLatest} />
       </>
     );
   }

@@ -10,7 +10,6 @@ import {
 } from "./icons.jsx";
 import { loadUiSession, saveUiSession } from "./sessionPersistence.js";
 
-const FUNNEL = ["New Order","Model Pending","Wax","PWBGD","JTRI","PTRI","Filing","Finding Balance","Single Pre Polish","Setting","MSHDS","Polish","Rodium","PQC","Third Party QC","Sampling","Job Work","GSI","FG","Adi Nath","Others"];
 const METALS = ["Gold","Silver","Platinum","Other"];
 // Literal hex (not CSS-var strings) — these feed both plain style backgrounds and
 // hex+alpha-suffix tints (e.g. `${METALC[x]}1f`), which only work with real hex values.
@@ -169,7 +168,7 @@ const NAV_SECTIONS = [
   { key: "partymix", label: "Party & Mix" },
 ];
 
-export default function Dashboard({ rows: ROWS, meta, fileName, onRefresh }) {
+export default function Dashboard({ rows: ROWS, meta, funnel, fileName, onRefresh }) {
   // Restored once per mount (e.g. after a page refresh); filters/sidebar state persists
   // independently of which Excel file is currently loaded.
   const [savedUi] = useState(() => loadUiSession() || {});
@@ -234,17 +233,16 @@ export default function Dashboard({ rows: ROWS, meta, fileName, onRefresh }) {
     rows.forEach((r) => { const me = metalOf(r); m[me] = m[me] || { bal:0, cp:0, cw:0 }; m[me].bal += r.bq; m[me].cp += r.cp; m[me].cw += r.cw; });
     return METALS.filter((me) => m[me]).map((me) => ({ name:me, ...m[me], fill:METALC[me] })); }, [rows]);
 
-  const phase = useMemo(() => { const m = {}; rows.forEach((r) => { if (FUNNEL.includes(r.ph)) m[r.ph] = (m[r.ph] || 0) + r.bq; });
-    return FUNNEL.filter((p) => m[p] > 0).map((p) => ({ name:p, qty:m[p] })); }, [rows]);
+  // Sourced from the workbook's own totals row (see parseWorkbook.js's buildFunnel) —
+  // a single pre-computed figure per stage, not summed from the currently filtered rows.
+  const phase = useMemo(() => (funnel || []).filter((p) => p.qty > 0), [funnel]);
   const maxPhase = Math.max(...phase.map((p) => p.qty), 1);
   const phaseTotal = useMemo(() => phase.reduce((s, p) => s + p.qty, 0), [phase]);
   const bottleneck = phase.filter((p) => p.name !== "New Order").reduce((a, b) => (b.qty > (a?.qty || 0) ? b : a), null);
 
-  // Grouped by Party (col A) — this file has no separate "Customer" column (only
-  // "Party" and "Sub Customer"), so r.c is always blank and would collapse every
-  // row into a single bucket.
+  // "Balance by party" panel groups by the Customer column (r.c), not Party (r.p).
   const byParty = useMemo(() => { const base = ROWS.filter((r) => (cat === "All" || r.cat === cat) && (metal === "All" || metalOf(r) === metal));
-    const m = {}; base.forEach((r) => { m[r.p] = (m[r.p] || 0) + r.bq; });
+    const m = {}; base.forEach((r) => { m[r.c] = (m[r.c] || 0) + r.bq; });
     return Object.entries(m).map(([name, bq]) => ({ name, bq })).sort((a, b) => b.bq - a.bq); }, [ROWS, cat, metal]);
   const byPartyTotal = useMemo(() => byParty.reduce((s, c) => s + c.bq, 0), [byParty]);
 
