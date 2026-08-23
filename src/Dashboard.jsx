@@ -407,15 +407,15 @@ export default function Dashboard({ rows: ROWS, meta, funnel, fileName, onRefres
           {/* ---------- Overview ---------- */}
           <div ref={sectionRefs.overview}>
             <div className="grid-stats" style={{ marginBottom:20 }}>
-              <StatCard label="Export Quantity" rawValue={k.bq} format={fmt} unit="pcs" sub={`${fmt(k.lines)} lines · ${fmt(k.fq)} on floor`}
+              <StatCard label="Export Balance Quantity" rawValue={k.bq} format={fmt} unit="pcs" sub={`${fmt(k.lines)} lines · ${fmt(k.fq)} on floor`}
                 icon={<IconTrendingUp width={20} height={20} />} accent={CH.blue} tint="rgba(59,130,246,.13)" grad={GRAD_BLUE}
                 sparkline={monthlyTotals.map((m) => m.bq)} delay={0} />
-              <StatCard label="Casting Pcs" rawValue={k.cp} format={fmt} unit="pcs" sub="in wax → casting"
+              <StatCard label="Casting Balance Quantity" rawValue={k.cp} format={fmt} unit="pcs" sub="in wax → casting"
                 icon={<IconLayers width={20} height={20} />} accent={CH.violet} tint="rgba(124,58,237,.13)" grad={GRAD_PURPLE}
                 sparkline={monthlyTotals.map((m) => m.cp)} delay={40} />
             </div>
 
-            <Panel title="Casting weight by quantity" hint="pure weight to cast (g / kg) · metal from Karat" style={{ marginBottom:20 }} delay={100}>
+            <Panel title="Metal weight of balance casting pieces" hint="pure weight to cast (g / kg) · metal from Karat" style={{ marginBottom:20 }} delay={100}>
               <div style={{ display:"flex", gap:14, flexWrap:"wrap" }}>
                 <MetalCard name="Gold" grams={castWtByMetal.Gold} accent={CH.gold} tint="rgba(245,158,11,.14)" grad={GRAD_GOLD} sparkline={metalMonthly("Gold")} delay={0} />
                 <MetalCard name="Silver" grams={castWtByMetal.Silver} accent="#64748B" tint="rgba(148,163,184,.18)" grad={GRAD_SILVER} sparkline={metalMonthly("Silver")} delay={30} />
@@ -477,7 +477,7 @@ export default function Dashboard({ rows: ROWS, meta, funnel, fileName, onRefres
               </div>
             </Panel>
 
-            <Panel title="Balance quantity" hint="balance · casting pcs · casting weight" style={{ marginBottom:20 }} delay={180}>
+            <Panel title="Metal wise balance quantity" hint="balance · casting pcs · casting weight" style={{ marginBottom:20 }} delay={180}>
               <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:24 }}>
                 {[["Balance qty","bal",(v)=>fmt(v)],["Casting pcs","cp",(v)=>fmt(v)],["Casting weight (g)","cw",(v)=>fmt2(v)]].map(([lab, key, f]) => {
                   const total = byMetal.reduce((s, x) => s + x[key], 0);
@@ -538,7 +538,7 @@ export default function Dashboard({ rows: ROWS, meta, funnel, fileName, onRefres
 
           {/* ---------- Party & mix ---------- */}
           <div ref={sectionRefs.partymix} className="grid2" style={{ marginBottom:20 }}>
-            <Panel title="Balance by party" hint="all parties by balance qty" delay={260}
+            <Panel title="Customer wise balance" hint="all customers by balance qty" delay={260}
               right={
                 <span style={{ fontSize:11.5, color:C.mut, background:"var(--panel-2)", border:`1px solid ${C.line}`, borderRadius:999, padding:"5px 12px", fontVariantNumeric:"tabular-nums" }}>
                   Total: <b style={{ color:C.text, fontWeight:800 }}>{fmt(byPartyTotal)}</b> pcs
