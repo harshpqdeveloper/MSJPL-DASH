@@ -1,14 +1,15 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Cell, PieChart, Pie, Tooltip, CartesianGrid, LabelList } from "recharts";
 import logoSmall from "./assets/logo-small.png";
-import { C, GRAD_BLUE, GRAD_PURPLE, GRAD_GOLD, GRAD_SILVER, GRAD_PLAT, SHADOW_MD, GLOBAL_CSS, REDUCED_MOTION } from "./theme.js";
-import { Segmented, PopoverButton } from "./ui.jsx";
+import { C, GRAD_BLUE, GRAD_PURPLE, GRAD_GOLD, GRAD_SILVER, GRAD_PLAT, GLOBAL_CSS, REDUCED_MOTION } from "./theme.js";
+import { Segmented, PopoverButton, CH, TT, useCountUp, MiniBars, StatCard, Panel } from "./ui.jsx";
 import {
   IconRefresh, IconChevronDown, IconInbox, IconSettings,
   IconMenu, IconChevronLeft, IconGrid, IconUser, IconGem,
   IconLayers, IconTrendingUp, IconShieldCheck,
 } from "./icons.jsx";
 import { loadUiSession, saveUiSession } from "./sessionPersistence.js";
+import FooterTrigger from "./analytics/FooterTrigger.jsx";
 
 const METALS = ["Gold","Silver","Platinum","Other"];
 // Literal hex (not CSS-var strings) — these feed both plain style backgrounds and
@@ -17,27 +18,7 @@ const METALC = { Gold:"#B45309", Silver:"#000000", Platinum:"#6B21A8", Other:"#6
 const fmt = (n) => Math.round(n).toLocaleString("en-IN");
 const fmt2 = (n) => n.toLocaleString("en-IN", { minimumFractionDigits:2, maximumFractionDigits:2 });
 
-// Concrete hex for Recharts (SVG fill/stroke attributes don't reliably resolve CSS custom
-// properties) — DOM styling elsewhere uses the CSS-var C object from theme.js.
-const CH = { primary:"#4F46E5", violet:"#7C3AED", blue:"#3B82F6", gold:"#F59E0B", steel:"#A855F7", plat:"#94A3B8",
-  emerald:"#22C55E", emeraldDk:"#15803D", amber:"#F59E0B", rose:"#EF4444", roseDk:"#B91C1C",
-  mut:"#000000", faint:"#000000", line:"#EBEEF6" };
 const CATC = [CH.primary, CH.gold, CH.steel, CH.emerald, CH.plat, CH.violet];
-
-const TT = ({ active, payload, label, unit }) => {
-  if (!active || !payload || !payload.length) return null;
-  return (
-    <div style={{ background:"var(--panel)", border:`1px solid ${CH.line}`, borderRadius:12,
-      padding:"10px 13px", fontSize:12, color:"var(--text)", boxShadow:SHADOW_MD }}>
-      <div style={{ color:"var(--mut)", marginBottom:5, fontWeight:700 }}>{label}</div>
-      {payload.map((p, i) => (
-        <div key={i} style={{ display:"flex", alignItems:"center", gap:6, padding:"1px 0" }}>
-          <span className="dot" style={{ background:p.color||CH.primary }} />{p.name}: <b style={{ fontVariantNumeric:"tabular-nums" }}>{fmt(p.value)}{unit||" pcs"}</b>
-        </div>
-      ))}
-    </div>
-  );
-};
 
 // Permanent data label for the "Balance by party" bars — inside the bar (right-aligned,
 // white) when the bar is wide enough for the text, otherwise just past the bar's end
@@ -63,68 +44,6 @@ const PartyBarLabel = (props) => {
   );
 };
 
-// ---- purely-visual count-up animation (numeric value in, animated numeric value out) ----
-function useCountUp(target, duration = 650) {
-  const [val, setVal] = useState(target);
-  const prevRef = useRef(target);
-  useEffect(() => {
-    const from = prevRef.current;
-    const to = target;
-    if (from === to) return undefined;
-    if (REDUCED_MOTION) { setVal(to); prevRef.current = to; return undefined; }
-    let raf; const start = performance.now();
-    const tick = (now) => {
-      const p = Math.min(1, (now - start) / duration);
-      const eased = 1 - Math.pow(1 - p, 3);
-      setVal(from + (to - from) * eased);
-      if (p < 1) raf = requestAnimationFrame(tick); else prevRef.current = to;
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [target, duration]);
-  return val;
-}
-
-// Tiny CSS-only bar sparkline — fed only with real, already-derived per-month totals
-// (never a fabricated trend number: this file has no prior-period data to compare against).
-function MiniBars({ data, color }) {
-  const max = Math.max(...data, 1);
-  if (data.length === 0) return null;
-  return (
-    <div style={{ display:"flex", alignItems:"flex-end", gap:3, width:64, height:28, flex:"none" }}>
-      {data.map((v, i) => (
-        <div key={i} className="mini-bar" style={{ flex:1, height:`${Math.max(10, (v / max) * 100)}%`, background:color, borderRadius:2,
-          opacity:.55 + 0.45 * (i + 1) / data.length, animationDelay:`${i * 140}ms` }} />
-      ))}
-    </div>
-  );
-}
-
-function StatCard({ label, rawValue, format, unit, sub, accent, tint, grad, icon, sparkline, delay = 0 }) {
-  const animated = useCountUp(rawValue);
-  return (
-    <div className="card card-hover animate-in" style={{ padding:"clamp(16px,4vw,20px) clamp(16px,4vw,22px)", animationDelay:`${delay}ms`, "--grad": grad }}>
-      <div className="grad-top" />
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16 }}>
-        <div style={{ fontSize:11, letterSpacing:".07em", textTransform:"uppercase", fontWeight:800, color:"var(--mut)" }}>{label}</div>
-        <div className="icon-badge" style={{ "--tint": tint, "--accent": accent }}>{icon}</div>
-      </div>
-      <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"space-between", gap:10 }}>
-        <div>
-          <div style={{ display:"flex", alignItems:"baseline", gap:6 }}>
-            <span style={{ fontFamily:"'Fraunces',serif", fontSize:"clamp(26px,7vw,34px)", fontWeight:700, lineHeight:1, letterSpacing:"-.01em", color:"var(--text)", fontVariantNumeric:"tabular-nums" }}>
-              {format(animated)}
-            </span>
-            {unit && <span style={{ fontSize:12.5, fontWeight:700, color:"var(--mut)" }}>{unit}</span>}
-          </div>
-          {sub && <div style={{ fontSize:11.5, marginTop:9, fontWeight:600, color:"var(--mut)" }}>{sub}</div>}
-        </div>
-        {sparkline && sparkline.length > 1 && <MiniBars data={sparkline} color={accent} />}
-      </div>
-    </div>
-  );
-}
-
 function MetalCard({ name, grams, accent, tint, grad, sparkline, delay = 0 }) {
   const animated = useCountUp(grams);
   return (
@@ -142,21 +61,6 @@ function MetalCard({ name, grams, accent, tint, grad, sparkline, delay = 0 }) {
         <span style={{ fontSize:12.5, fontWeight:700, color:"var(--mut)" }}>g</span>
       </div>
       <div style={{ fontSize:12, marginTop:8, fontWeight:600, color:"var(--mut)" }}>{(grams/1000).toFixed(2)} kg to cast</div>
-    </div>
-  );
-}
-
-function Panel({ title, hint, right, children, style, delay = 0, innerRef }) {
-  return (
-    <div ref={innerRef} className="card animate-in" style={{ padding:"clamp(14px,4vw,20px)", animationDelay:`${delay}ms`, ...style }}>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16, flexWrap:"wrap", gap:10 }}>
-        <div>
-          <h3 style={{ margin:0, fontSize:13, fontWeight:800, letterSpacing:".04em", color:"var(--primary-dk)", textTransform:"uppercase" }}>{title}</h3>
-          {hint && <div style={{ fontSize:11, color:C.faint, marginTop:3 }}>{hint}</div>}
-        </div>
-        {right}
-      </div>
-      {children}
     </div>
   );
 }
@@ -587,6 +491,16 @@ export default function Dashboard({ rows: ROWS, meta, funnel, fileName, onRefres
             </Panel>
           </div>
         </div>
+
+        <footer style={{
+          display:"flex", alignItems:"center", justifyContent:"center", gap:10,
+          padding:"16px clamp(14px,4vw,26px) 22px", borderTop:`1px solid ${C.lineSoft}`,
+        }}>
+          <span style={{ fontSize:11, color:C.faint, fontWeight:600 }}>
+            © {new Date().getFullYear()} M. Suresh Jewellery — Production &amp; Casting Dashboard
+          </span>
+          <FooterTrigger />
+        </footer>
       </div>
     </div>
   );

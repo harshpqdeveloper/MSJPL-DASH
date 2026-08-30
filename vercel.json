@@ -3,5 +3,8 @@
     "api/excel/*.js": {
       "includeFiles": "excel/**"
     }
-  }
+  },
+  "rewrites": [
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
 }

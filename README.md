@@ -158,6 +158,36 @@ has the newest modification time. You can keep old exports there; only the newes
 Edit files in `src/` (visuals in `Dashboard.jsx`, parsing/formulas in `parseWorkbook.js`),
 then `npm run build` again and restart `npm run preview`.
 
+## Visitor analytics
+
+A private `/analytics` page tracks real visits to the dashboard (page, anonymous
+visitor/session id, device/browser/OS, referrer — no names, no IP addresses) and shows KPIs,
+a trend chart, device/browser/OS/traffic-source breakdowns, and a top-pages table. It's
+reached by clicking the small, unlabeled icon in the dashboard's footer **three times
+quickly** (or by going to `/analytics` directly) and is protected by a separate admin
+password — normal visitors never see it, and the data API rejects requests without a valid
+session, not just a hidden URL.
+
+**Setup (one-time):**
+
+1. Add a Postgres database to the project — in the Vercel dashboard, add a **Postgres**
+   storage integration (Neon-backed) to this project. This sets a `DATABASE_URL` (or
+   `POSTGRES_URL`) environment variable automatically in your Vercel project.
+2. Add three more environment variables (Vercel project settings, and/or a local `.env`
+   file for `npm run dev`):
+   - `ANALYTICS_ADMIN_EMAIL` / `ANALYTICS_ADMIN_PASSWORD` — the only credentials accepted
+     at the `/analytics` sign-in form.
+   - `ANALYTICS_SESSION_SECRET` — a random string used to sign the login session cookie
+     (e.g. generate one with `openssl rand -hex 32`).
+3. Create the analytics table (run once, whenever `DATABASE_URL` is set locally or pulled
+   via `vercel env pull`):
+   ```
+   npm run db:migrate
+   ```
+
+After that, `npm run dev` / `npm run preview` and the Vercel deployment all track visits and
+serve `/analytics` the same way — no separate backend to run.
+
 ## Project structure
 
 ```
@@ -167,11 +197,25 @@ jewellery-dashboard/
 ├─ package.json            dependencies & scripts
 ├─ vite.config.js          dev/preview server config (LAN host enabled)
 ├─ vite-excel-plugin.js    tiny local API that finds the latest file in excel/
+├─ vite-analytics-plugin.js  tiny local API mirroring /api/analytics/* for `npm run dev`
+├─ scripts/
+│  └─ migrate-analytics.mjs  one-time analytics_events table/index setup (`npm run db:migrate`)
+├─ lib/
+│  ├─ excelFile.js         shared logic behind /api/excel/*
+│  ├─ analyticsDb.js       Postgres queries (event insert, KPI/trend/breakdown summary)
+│  ├─ analyticsUA.js       hand-rolled User-Agent / referrer classification
+│  ├─ analyticsAuth.js     admin password check + signed session cookie
+│  └─ analyticsApi.js      shared /api/analytics/* request handlers
+├─ api/
+│  ├─ excel/               Vercel functions serving the Excel file (mirrors vite-excel-plugin.js)
+│  └─ analytics/           Vercel functions for track/login/logout/session/summary
 ├─ src/
-│  ├─ main.jsx             React bootstrap
+│  ├─ main.jsx             React bootstrap — routes "/" to App, "/analytics" to AnalyticsRoute
 │  ├─ App.jsx              auto-loads the latest Excel file / loading / empty / error states
 │  ├─ parseWorkbook.js     reads the XLSX and computes all metrics (AN, AO, metal, month, phase)
-│  └─ Dashboard.jsx        the full dashboard UI
+│  ├─ Dashboard.jsx        the full dashboard UI (footer holds the hidden analytics trigger)
+│  ├─ ui.jsx               shared cards/panels/tooltips used by both the dashboard and analytics
+│  └─ analytics/           FooterTrigger, trackVisit (client tracking), and the /analytics page
 └─ dist/                   built static site (created by `npm run build`)
 ```
 
