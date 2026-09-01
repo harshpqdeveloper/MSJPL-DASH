@@ -6,6 +6,7 @@ import MSJPLIntro from "./MSJPLIntro.jsx";
 import logo from "./assets/logo.png";
 import { C, GLOBAL_CSS } from "./theme.js";
 import { IconFileWarning, IconInbox } from "./icons.jsx";
+import { trackVisit } from "./analytics/trackVisit.js";
 
 // How often to re-check the excel/ folder for a new or updated file once the
 // dashboard is up. Cheap: it's just a small JSON status fetch unless the file
@@ -75,6 +76,12 @@ export default function App() {
     const id = setInterval(loadLatest, POLL_MS);
     return () => clearInterval(id);
   }, [loadLatest]);
+
+  // Fires once per tab session (see trackVisit's own de-dupe guard) — this component only
+  // ever mounts for the main dashboard route, never for /analytics itself.
+  useEffect(() => {
+    trackVisit();
+  }, []);
 
   const intro = !introDone && (
     <MSJPLIntro ready={status !== "loading"} onFinish={() => setIntroDone(true)} />

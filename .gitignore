@@ -8,3 +8,8 @@ dist
 # Excel's own lock files (created while the file is open in Excel) — never commit these.
 excel/~$*.xlsx
 excel/~$*.xls
+
+# Secrets: Postgres connection string, analytics admin password/session secret.
+.env
+.env.*
+!.env.example
