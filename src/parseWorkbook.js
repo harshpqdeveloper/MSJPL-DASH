@@ -153,12 +153,20 @@ export function parseWorkbook(arrayBuffer) {
   // No cellDates -> dates arrive as serial numbers, converted via UTC in toDate().
   const wb = XLSX.read(arrayBuffer, { type: "array" });
 
+  // Some exports carry a second "Raw" sheet alongside the real one (same order lines,
+  // but without a Customer column or the totals row the funnel reads from). Prefer the
+  // first sheet with order lines AND a Customer column; fall back to the first sheet
+  // with order lines at all if none has one.
   let sheetName = wb.SheetNames[0];
+  let fallbackName = null;
   for (const nm of wb.SheetNames) {
-    const flat = XLSX.utils.sheet_to_json(wb.Sheets[nm], { header: 1, raw: true, defval: null })
-      .slice(0, 15).flat().map(lc);
-    if (flat.includes("order srno")) { sheetName = nm; break; }
+    const candAoa = XLSX.utils.sheet_to_json(wb.Sheets[nm], { header: 1, raw: true, defval: null }).slice(0, 15);
+    if (!candAoa.flat().map(lc).includes("order srno")) continue;
+    if (!fallbackName) fallbackName = nm;
+    const hRow = candAoa[findHeaderRow(candAoa)] || [];
+    if (hRow.map(lc).includes("customer")) { sheetName = nm; fallbackName = null; break; }
   }
+  if (fallbackName) sheetName = fallbackName;
 
   const ws = wb.Sheets[sheetName];
   const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
