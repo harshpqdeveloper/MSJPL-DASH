@@ -72,7 +72,14 @@ const NAV_SECTIONS = [
   { key: "partymix", label: "Party & Mix" },
 ];
 
-export default function Dashboard({ rows: ROWS, meta, funnel, fileName, onRefresh }) {
+export default function Dashboard({ rows: ROWS, meta, funnel, fileName, fileMtimeMs, onRefresh }) {
+  // Shown in the header as "Data as of" — the date the Excel file itself was saved,
+  // not the computed BalDelvDays snapshot (which can land a day off from the file date).
+  const fileDate = useMemo(() => {
+    if (!fileMtimeMs) return null;
+    const d = new Date(fileMtimeMs);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }, [fileMtimeMs]);
   // Restored once per mount (e.g. after a page refresh); filters/sidebar state persists
   // independently of which Excel file is currently loaded.
   const [savedUi] = useState(() => loadUiSession() || {});
@@ -254,9 +261,9 @@ export default function Dashboard({ rows: ROWS, meta, funnel, fileName, onRefres
                 <h1 style={{ margin:0, fontFamily:"'Fraunces',serif", fontWeight:700, fontSize:"clamp(16px,4.5vw,21px)", color:C.text, letterSpacing:"-.01em", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
                   Production &amp; Casting Dashboard
                 </h1>
-                {meta.asOf && (
+                {fileDate && (
                   <div style={{ fontSize:12, color:C.mut, marginTop:2, wordBreak:"break-word" }}>
-                    <span style={{ color:"var(--primary-dk)", fontWeight:700 }}>Data as of {meta.asOf}</span>
+                    <span style={{ color:"var(--primary-dk)", fontWeight:700 }}>Data as of {fileDate}</span>
                   </div>
                 )}
               </div>
@@ -268,7 +275,7 @@ export default function Dashboard({ rows: ROWS, meta, funnel, fileName, onRefres
               </button>
 
               <PopoverButton icon={<IconSettings width={16} height={16} />} label="File details" panelTitle="File details">
-                {[["Sheet", meta.sheetName], ["Header row", meta.headerRow], ["Order lines", fmt(ROWS.length)], ["Snapshot date", meta.asOf || "—"]].map(([k2, v]) => (
+                {[["File", fileName || "—"], ["Sheet", meta.sheetName], ["Header row", meta.headerRow], ["Order lines", fmt(ROWS.length)], ["Data as of", fileDate || "—"], ["Computed snapshot", meta.asOf || "—"]].map(([k2, v]) => (
                   <div key={k2} style={{ display:"flex", justifyContent:"space-between", fontSize:12.5, padding:"5px 0", borderBottom:"1px solid var(--line-soft)" }}>
                     <span style={{ color:"var(--mut)" }}>{k2}</span><span style={{ fontWeight:700, color:"var(--text)" }}>{v}</span>
                   </div>
