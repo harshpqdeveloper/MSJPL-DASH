@@ -168,22 +168,21 @@ quickly** (or by going to `/analytics` directly) and is protected by a separate 
 password — normal visitors never see it, and the data API rejects requests without a valid
 session, not just a hidden URL.
 
+Visit data is stored in **Supabase** (Postgres) — the same project used for the Excel file.
+
 **Setup (one-time):**
 
-1. Add a Postgres database to the project — in the Vercel dashboard, add a **Postgres**
-   storage integration (Neon-backed) to this project. This sets a `DATABASE_URL` (or
-   `POSTGRES_URL`) environment variable automatically in your Vercel project.
-2. Add three more environment variables (Vercel project settings, and/or a local `.env`
-   file for `npm run dev`):
+1. Set these environment variables (Vercel project settings, and/or a local `.env` file for
+   `npm run dev`):
+   - `SUPABASE_URL` / `SUPABASE_SECRET_KEY` — your Supabase project URL and service (secret)
+     key. `SUPABASE_SERVICE_ROLE_KEY` is accepted as an alternative name for the key.
    - `ANALYTICS_ADMIN_EMAIL` / `ANALYTICS_ADMIN_PASSWORD` — the only credentials accepted
      at the `/analytics` sign-in form.
    - `ANALYTICS_SESSION_SECRET` — a random string used to sign the login session cookie
      (e.g. generate one with `openssl rand -hex 32`).
-3. Create the analytics table (run once, whenever `DATABASE_URL` is set locally or pulled
-   via `vercel env pull`):
-   ```
-   npm run db:migrate
-   ```
+2. Create the analytics table (run once): open the Supabase dashboard → SQL Editor → paste
+   and run [`supabase/analytics-setup.sql`](supabase/analytics-setup.sql). (`npm run db:migrate`
+   just prints that SQL for you.)
 
 After that, `npm run dev` / `npm run preview` and the Vercel deployment all track visits and
 serve `/analytics` the same way — no separate backend to run.
