@@ -9,6 +9,7 @@
     "start": "vite --host",
     "build": "vite build",
     "preview": "vite preview --host --port 8080",
+    "sync": "node scripts/sync-excel.mjs",
     "db:migrate": "node scripts/migrate-analytics.mjs"
   },
   "dependencies": {
