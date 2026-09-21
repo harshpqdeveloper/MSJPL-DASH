@@ -13,3 +13,8 @@ excel/~$*.xls
 .env
 .env.*
 !.env.example
+
+# Exported Excel files - handled by MSJPL Excel Auto Sync
+excel/*.xls
+excel/*.xlsx
+excel/*.xlsm

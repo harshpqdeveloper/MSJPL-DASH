@@ -1,24 +1,17 @@
-// One-time setup: creates the analytics_events table + indexes. Run with `npm run db:migrate`
-// after setting DATABASE_URL (see README.md's Visitor analytics section). Not run
-// automatically per-request — keeps the hot visitor-tracking path fast.
-try {
-  process.loadEnvFile();
-} catch {
-  // no .env file — fine if the connection string is already in the real environment
-}
+// One-time setup for the /analytics dashboard's storage.
+//
+// Analytics now lives in Supabase (see lib/analyticsDb.js). Supabase's JS client can't run
+// DDL, so the table + indexes are created by pasting supabase/analytics-setup.sql into the
+// Supabase SQL editor. This script just prints that SQL and where to run it.
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
 
-const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.POSTGRES_URL_NON_POOLING;
-if (!connectionString) {
-  console.error(
-    "No Postgres connection string found. Set DATABASE_URL in your environment or a local .env file, then re-run `npm run db:migrate`."
-  );
-  process.exit(1);
-}
+const here = path.dirname(fileURLToPath(import.meta.url));
+const sqlPath = path.join(here, "..", "supabase", "analytics-setup.sql");
 
-const { neon } = await import("@neondatabase/serverless");
-const { runMigration } = await import("../lib/analyticsDb.js");
-
-const sql = neon(connectionString);
-console.log("Creating analytics_events table and indexes (if they don't already exist)...");
-await runMigration(sql);
-console.log("Done.");
+console.log("\nAnalytics uses Supabase. Create the table once in the Supabase SQL editor:\n");
+console.log("  Supabase Dashboard -> SQL Editor -> New query -> paste the SQL below -> Run\n");
+console.log("--------------------------------------------------------------------------------");
+console.log(readFileSync(sqlPath, "utf8").trimEnd());
+console.log("--------------------------------------------------------------------------------\n");

@@ -375,15 +375,11 @@ export default function Dashboard({ rows: ROWS, meta, funnel, fileName, onRefres
                   </table>
                 </div>
               </div>
-              <div style={{ fontSize:11, color:C.faint, marginTop:12 }}>
-                Casting pcs = cols AE:AM (AN). Casting weight = unit weight (Z) × AN (AO). Month = production delivery date.
-                Metal derived from Karat (col S): contains G → Gold, P → Platinum, S → Silver.
-              </div>
             </Panel>
 
-            <Panel title="Metal wise balance quantity" hint="balance · casting pcs · casting weight" style={{ marginBottom:20 }} delay={180}>
+            <Panel title="Delivery Balance Quantity" hint="balance · casting pcs · casting weight" style={{ marginBottom:20 }} delay={180}>
               <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:24 }}>
-                {[["Balance qty","bal",(v)=>fmt(v)],["Casting pcs","cp",(v)=>fmt(v)],["Casting weight (g)","cw",(v)=>fmt2(v)]].map(([lab, key, f]) => {
+                {[["Balance qty","bal",(v)=>fmt(v)],["Balance pcs","cp",(v)=>fmt(v)],["Casting Weight ( Balance pcs )","cw",(v)=>fmt2(v)]].map(([lab, key, f]) => {
                   const total = byMetal.reduce((s, x) => s + x[key], 0);
                   const denom = total || 1;
                   return (<div key={key}>
