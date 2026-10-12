@@ -18,6 +18,22 @@ const METALC = { Gold:"#B45309", Silver:"#000000", Platinum:"#6B21A8", Other:"#6
 const fmt = (n) => Math.round(n).toLocaleString("en-IN");
 const fmt2 = (n) => n.toLocaleString("en-IN", { minimumFractionDigits:2, maximumFractionDigits:2 });
 
+// When the loaded file was last updated (file modified-time locally, Supabase upload time
+// on Vercel), in the viewer's local time: "2026-10-12" + "07:01 AM".
+const pad2 = (n) => String(n).padStart(2, "0");
+const fmtYmd = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const fmtTime = (d) => `${pad2(d.getHours() % 12 || 12)}:${pad2(d.getMinutes())} ${d.getHours() < 12 ? "AM" : "PM"}`;
+const fmtUpdated = (ms) => { const d = new Date(ms); return ms && !isNaN(d) ? { date:fmtYmd(d), time:fmtTime(d) } : null; };
+
+// Header line: the workbook's snapshot date plus the update time. The time is only joined
+// onto the snapshot date when both fall on the same day — otherwise it is shown separately,
+// so an older snapshot uploaded later never reads as if the data were that fresh.
+const asOfLabel = (asOf, updated) => {
+  if (!updated) return asOf ? `Data as of ${asOf}` : "";
+  if (!asOf) return `Updated ${updated.date}, ${updated.time}`;
+  return updated.date === asOf ? `Data as of ${asOf}, ${updated.time}` : `Data as of ${asOf} · updated ${updated.date}, ${updated.time}`;
+};
+
 const CATC = [CH.primary, CH.gold, CH.steel, CH.emerald, CH.plat, CH.violet];
 
 // Permanent data label for the "Balance by party" bars — inside the bar (right-aligned,
@@ -72,7 +88,10 @@ const NAV_SECTIONS = [
   { key: "partymix", label: "Party & Mix" },
 ];
 
-export default function Dashboard({ rows: ROWS, meta, funnel, fileName, onRefresh }) {
+export default function Dashboard({ rows: ROWS, meta, funnel, fileName, updatedAt, onRefresh }) {
+  const updated = fmtUpdated(updatedAt);
+  const headerAsOf = asOfLabel(meta.asOf, updated);
+
   // Restored once per mount (e.g. after a page refresh); filters/sidebar state persists
   // independently of which Excel file is currently loaded.
   const [savedUi] = useState(() => loadUiSession() || {});
@@ -254,9 +273,9 @@ export default function Dashboard({ rows: ROWS, meta, funnel, fileName, onRefres
                 <h1 style={{ margin:0, fontFamily:"'Fraunces',serif", fontWeight:700, fontSize:"clamp(16px,4.5vw,21px)", color:C.text, letterSpacing:"-.01em", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
                   Production &amp; Casting Dashboard
                 </h1>
-                {meta.asOf && (
+                {headerAsOf && (
                   <div style={{ fontSize:12, color:C.mut, marginTop:2, wordBreak:"break-word" }}>
-                    <span style={{ color:"var(--primary-dk)", fontWeight:700 }}>Data as of {meta.asOf}</span>
+                    <span style={{ color:"var(--primary-dk)", fontWeight:700 }}>{headerAsOf}</span>
                   </div>
                 )}
               </div>
@@ -268,7 +287,7 @@ export default function Dashboard({ rows: ROWS, meta, funnel, fileName, onRefres
               </button>
 
               <PopoverButton icon={<IconSettings width={16} height={16} />} label="File details" panelTitle="File details">
-                {[["Sheet", meta.sheetName], ["Header row", meta.headerRow], ["Order lines", fmt(ROWS.length)], ["Snapshot date", meta.asOf || "—"]].map(([k2, v]) => (
+                {[["Sheet", meta.sheetName], ["Header row", meta.headerRow], ["Order lines", fmt(ROWS.length)], ["Snapshot date", meta.asOf || "—"], ["Last updated", updated ? `${updated.date}, ${updated.time}` : "—"]].map(([k2, v]) => (
                   <div key={k2} style={{ display:"flex", justifyContent:"space-between", fontSize:12.5, padding:"5px 0", borderBottom:"1px solid var(--line-soft)" }}>
                     <span style={{ color:"var(--mut)" }}>{k2}</span><span style={{ fontWeight:700, color:"var(--text)" }}>{v}</span>
                   </div>

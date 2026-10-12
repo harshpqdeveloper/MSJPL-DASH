@@ -16,6 +16,7 @@ const POLL_MS = 5000;
 export default function App() {
   const [data, setData] = useState(null);
   const [fileName, setFileName] = useState("");
+  const [updatedAt, setUpdatedAt] = useState(null); // ms timestamp the loaded file was last updated
   const [status, setStatus] = useState("loading"); // loading | ready | not-found | error
   const [error, setError] = useState("");
   const [introDone, setIntroDone] = useState(false);
@@ -35,7 +36,7 @@ export default function App() {
 
     if (!metaRes.ok || !metaJson.found) {
       signatureRef.current = "";
-      setData(null); setFileName(""); setError("");
+      setData(null); setFileName(""); setUpdatedAt(null); setError("");
       setStatus("not-found");
       return;
     }
@@ -62,7 +63,7 @@ export default function App() {
       );
 
       signatureRef.current = signature;
-      setData(parsed); setFileName(metaJson.fileName); setError("");
+      setData(parsed); setFileName(metaJson.fileName); setUpdatedAt(metaJson.mtimeMs); setError("");
       setStatus("ready");
     } catch (e) {
       console.error(e);
@@ -91,7 +92,7 @@ export default function App() {
     return (
       <>
         {intro}
-        <Dashboard rows={data.rows} meta={data.meta} funnel={data.funnel} fileName={fileName} onRefresh={loadLatest} />
+        <Dashboard rows={data.rows} meta={data.meta} funnel={data.funnel} fileName={fileName} updatedAt={updatedAt} onRefresh={loadLatest} />
       </>
     );
   }
