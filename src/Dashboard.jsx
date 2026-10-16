@@ -161,7 +161,6 @@ export default function Dashboard({ rows: ROWS, meta, funnel, fileName, updatedA
   const phase = useMemo(() => (funnel || []).filter((p) => p.qty > 0), [funnel]);
   const maxPhase = Math.max(...phase.map((p) => p.qty), 1);
   const phaseTotal = useMemo(() => phase.reduce((s, p) => s + p.qty, 0), [phase]);
-  const bottleneck = phase.filter((p) => p.name !== "New Order").reduce((a, b) => (b.qty > (a?.qty || 0) ? b : a), null);
 
   // "Balance by party" panel groups by the Customer column (r.c), not Party (r.p).
   const byParty = useMemo(() => { const base = ROWS.filter((r) => (cat === "All" || r.cat === cat) && (metal === "All" || metalOf(r) === metal));
@@ -431,18 +430,17 @@ export default function Dashboard({ rows: ROWS, meta, funnel, fileName, updatedA
               }
             >
               <div style={{ display:"flex", flexDirection:"column", gap:9 }}>
-                {phase.map((p) => { const isB = bottleneck && p.name === bottleneck.name; const isStart = p.name === "New Order";
+                {phase.map((p) => { const isStart = p.name === "New Order";
                   return (<div key={p.name}>
                     <div style={{ display:"flex", justifyContent:"space-between", fontSize:12, marginBottom:4 }}>
-                      <span style={{ color:isB ? "var(--danger-dk)" : C.text, display:"flex", alignItems:"center", gap:6, fontWeight:isB?700:400 }}>
+                      <span style={{ color:C.text, display:"flex", alignItems:"center", gap:6 }}>
                         {p.name}
-                        {isB && <span className="badge" style={{ background:"rgba(239,68,68,.13)", color:"var(--danger-dk)", fontSize:9.5, letterSpacing:".06em" }}>◆ BOTTLENECK</span>}
                       </span>
                       <span style={{ color:C.text, fontVariantNumeric:"tabular-nums", fontWeight:700 }}>{fmt(p.qty)}</span>
                     </div>
                     <div style={{ height:9, background:C.panel2, borderRadius:5, overflow:"hidden" }}>
                       <div style={{ width:`${100 * p.qty / maxPhase}%`, height:"100%", borderRadius:5, transition:"width .5s cubic-bezier(.16,1,.3,1)",
-                        background:isB ? "var(--grad-danger)" : (isStart ? "var(--primary-lt)" : "var(--grad-primary)") }} />
+                        background:isStart ? "var(--primary-lt)" : "var(--grad-primary)" }} />
                     </div></div>);
                 })}
                 {phase.length === 0 && (
