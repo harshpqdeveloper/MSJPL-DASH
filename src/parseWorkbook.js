@@ -7,6 +7,8 @@ import * as XLSX from "xlsx";
 //   Metal  = derived ONLY from Karat (col S):
 //            contains G/g -> Gold, else P/p -> Platinum, else S/s -> Silver
 //   Month  = production delivery date (Prd Delv Dt, col L)
+//   On floor = Exp Bal Qty - (PCELL + FG + SHP3 + SHP4 + RGTS)
+//   Orders raised on a day = lines whose Order Dt is that day (qty = Order Qty)
 //   Production Funnel = the sheet's OWN pre-computed column totals, one row above
 //            the header row (see FUNNEL_MAPPING below), not summed from order lines.
 // Header row is auto-detected. Dates are converted via UTC to avoid the
@@ -19,6 +21,10 @@ import * as XLSX from "xlsx";
 const TARGET_YEAR = 2026;
 
 const CAST_STAGES = ["SO","PMDR","PWAX-A","PWAX-B","PWAX","PWXST","PWBGD","PWBGD-LGD","PTRI"];
+
+// On floor = Exp Bal Qty minus the pieces already out of production: in GSI, finished goods,
+// shipping and RGTS.
+const OFF_FLOOR_STAGES = ["PCELL","FG","SHP3","SHP4","RGTS"];
 
 // Production Funnel mapping (per-column, supplied manually). Each header's value is
 // read from the source workbook's own totals row (the row directly above the stage
@@ -180,6 +186,7 @@ export function parseWorkbook(arrayBuffer) {
     customer: idxOf("Customer"),
     srno: idxOf("Order SrNo"),
     otype: idxOf("Order Type"),
+    orderDt: idxOf("Order Dt", "Order Date"),
     delv: idxOf("Prd Delv Dt"),
     balDays: idxOf("BalDelvDays"),
     category: idxOf("Category"),
@@ -189,13 +196,13 @@ export function parseWorkbook(arrayBuffer) {
     expQty: idxOf("Exp Bal Qty", "Export Qty", "Exp Bal Qty."),
     unitWt: idxOf("Unit Metal PureWt", "UnitWeight", "Unit Weight", "Unit Metal Pure Wt"),
     balQty: idxOf("Bal Qty"),
-    floorQty: idxOf("Floor Qty"),
   };
 
   const stageIdx = {};
   header.forEach((h, i) => { if (h) stageIdx[h] = i; });
   const stageColsPresent = (list) => list.map((n) => stageIdx[n]).filter((i) => i != null && i >= 0);
   const castIdx = stageColsPresent(CAST_STAGES);
+  const offFloorIdx = stageColsPresent(OFF_FLOOR_STAGES);
 
   if (col.delv < 0) throw new Error("Prd Delv Dt column could not be found in the Jemmy Excel file.");
 
@@ -225,8 +232,13 @@ export function parseWorkbook(arrayBuffer) {
     for (const ci of castIdx) cp += toNum(row[ci]);
     const cw = Math.round(unitWt * cp * 100) / 100;
 
+    const eq = col.expQty >= 0 ? toNum(row[col.expQty]) : 0;
+    let offFloor = 0;
+    for (const ci of offFloorIdx) offFloor += toNum(row[ci]);
+
     const { mb, ms } = monthBucket(dDate);
     const catRaw = col.category >= 0 ? norm(row[col.category]) : "";
+    const oDate = col.orderDt >= 0 ? toDate(row[col.orderDt]) : null;
 
     rows.push({
       p: col.party >= 0 ? norm(row[col.party]) || "—" : "—",
@@ -236,8 +248,9 @@ export function parseWorkbook(arrayBuffer) {
       mt: metalFromKarat(karat),
       bq: Math.round(bq),
       oq: col.orderQty >= 0 ? Math.round(toNum(row[col.orderQty])) : 0,
-      eq: col.expQty >= 0 ? Math.round(toNum(row[col.expQty])) : 0,
-      fq: col.floorQty >= 0 ? Math.round(toNum(row[col.floorQty])) : 0,
+      eq: Math.round(eq),
+      fq: Math.round(eq - offFloor),
+      od: oDate ? ymd(oDate) : "",
       cp: Math.round(cp),
       cw,
       d: col.balDays >= 0 && row[col.balDays] != null && row[col.balDays] !== "" ? Math.round(toNum(row[col.balDays])) : null,

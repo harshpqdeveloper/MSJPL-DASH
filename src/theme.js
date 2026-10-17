@@ -211,6 +211,16 @@ button:focus-visible,select:focus-visible,input:focus-visible,[tabindex]:focus-v
   border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-lg);padding:14px;z-index:50;
   animation:popIn .18s cubic-bezier(.16,1,.3,1) both}
 
+/* ---- modal (customer details popup) ---- */
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal-backdrop{position:fixed;inset:0;z-index:60;background:rgba(15,23,42,.45);display:flex;align-items:center;
+  justify-content:center;padding:clamp(8px,3vw,28px);animation:fadeIn .18s ease both}
+.modal{width:min(1340px,100%);max-height:100%;display:flex;flex-direction:column;background:var(--bg);
+  border-radius:${RADIUS.card};box-shadow:var(--shadow-lg);overflow:hidden;animation:popIn .22s cubic-bezier(.16,1,.3,1) both}
+.modal-head{display:flex;align-items:center;justify-content:space-between;gap:14px;flex:none;
+  padding:16px clamp(14px,3vw,22px);background:var(--panel);border-bottom:1px solid var(--line)}
+.modal-body{overflow:auto;padding:clamp(14px,3vw,22px)}
+
 /* ---- avatar ---- */
 .avatar{width:36px;height:36px;border-radius:11px;background:var(--grad-primary);color:#fff;
   display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex:none;

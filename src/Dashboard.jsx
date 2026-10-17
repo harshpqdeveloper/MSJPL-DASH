@@ -1,12 +1,12 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Cell, PieChart, Pie, Tooltip, CartesianGrid, LabelList } from "recharts";
 import logoSmall from "./assets/logo-small.png";
-import { C, GRAD_BLUE, GRAD_PURPLE, GRAD_GOLD, GRAD_SILVER, GRAD_PLAT, GLOBAL_CSS, REDUCED_MOTION } from "./theme.js";
+import { C, GRAD_BLUE, GRAD_PURPLE, GRAD_GOLD, GRAD_SILVER, GRAD_PLAT, GRAD_SUCCESS, GLOBAL_CSS, REDUCED_MOTION } from "./theme.js";
 import { Segmented, PopoverButton, CH, TT, useCountUp, MiniBars, StatCard, Panel } from "./ui.jsx";
 import {
   IconRefresh, IconChevronDown, IconInbox, IconSettings,
   IconMenu, IconChevronLeft, IconGrid, IconUser, IconGem,
-  IconLayers, IconTrendingUp, IconShieldCheck,
+  IconLayers, IconTrendingUp, IconShieldCheck, IconCalendar, IconX, IconSearch,
 } from "./icons.jsx";
 import { loadUiSession, saveUiSession } from "./sessionPersistence.js";
 import FooterTrigger from "./analytics/FooterTrigger.jsx";
@@ -18,21 +18,13 @@ const METALC = { Gold:"#B45309", Silver:"#000000", Platinum:"#6B21A8", Other:"#6
 const fmt = (n) => Math.round(n).toLocaleString("en-IN");
 const fmt2 = (n) => n.toLocaleString("en-IN", { minimumFractionDigits:2, maximumFractionDigits:2 });
 
-// When the loaded file was last updated (file modified-time locally, Supabase upload time
-// on Vercel), in the viewer's local time: "2026-10-12" + "07:01 AM".
+// Calendar days as YYYY-MM-DD on the viewer's clock — same shape as each row's Order Dt (r.od).
 const pad2 = (n) => String(n).padStart(2, "0");
-const fmtYmd = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-const fmtTime = (d) => `${pad2(d.getHours() % 12 || 12)}:${pad2(d.getMinutes())} ${d.getHours() < 12 ? "AM" : "PM"}`;
-const fmtUpdated = (ms) => { const d = new Date(ms); return ms && !isNaN(d) ? { date:fmtYmd(d), time:fmtTime(d) } : null; };
+const localYmd = (d = new Date()) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const ymdToDate = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+const shiftYmd = (s, n) => { const d = ymdToDate(s); d.setDate(d.getDate() + n); return localYmd(d); };
+const fmtDay = (s) => ymdToDate(s).toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" });
 
-// Header line: the workbook's snapshot date plus the update time. The time is only joined
-// onto the snapshot date when both fall on the same day — otherwise it is shown separately,
-// so an older snapshot uploaded later never reads as if the data were that fresh.
-const asOfLabel = (asOf, updated) => {
-  if (!updated) return asOf ? `Data as of ${asOf}` : "";
-  if (!asOf) return `Updated ${updated.date}, ${updated.time}`;
-  return updated.date === asOf ? `Data as of ${asOf}, ${updated.time}` : `Data as of ${asOf} · updated ${updated.date}, ${updated.time}`;
-};
 
 const CATC = [CH.primary, CH.gold, CH.steel, CH.emerald, CH.plat, CH.violet];
 
@@ -81,6 +73,205 @@ function MetalCard({ name, grams, accent, tint, grad, sparkline, delay = 0 }) {
   );
 }
 
+// Label · value · share bar, one row per group (same look as the Delivery Balance panel).
+function BreakdownList({ title, items }) {
+  const denom = items.reduce((s, x) => s + x.value, 0) || 1;
+  return (
+    <div className="card" style={{ padding:16 }}>
+      <div style={{ fontSize:11, color:C.mut, textTransform:"uppercase", letterSpacing:".05em", marginBottom:11, fontWeight:800 }}>{title}</div>
+      {/* Long lists (a customer with many parties) scroll inside the card instead of stretching it. */}
+      <div className="table-scroll" style={{ maxHeight:176, paddingRight:items.length > 5 ? 8 : 0 }}>
+        {items.map((m) => (
+          <div key={m.name} style={{ marginBottom:10 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", fontSize:12, marginBottom:4, alignItems:"center", gap:8 }}>
+              <span style={{ fontWeight:600, display:"flex", alignItems:"center", gap:6 }}>{m.color && <span className="dot" style={{ background:m.color }} />}{m.name}</span>
+              <span style={{ color:C.text, fontVariantNumeric:"tabular-nums", fontWeight:800 }}>{fmt(m.value)}</span>
+            </div>
+            <div style={{ height:6, background:C.panel2, borderRadius:5, overflow:"hidden" }}>
+              <div style={{ width:`${100 * m.value / denom}%`, height:"100%", background:"var(--grad-primary)", borderRadius:5 }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Order lines listed per "Show more" step in the customer popup — the biggest customers have 1,500+.
+const CUSTOMER_PAGE = 100;
+
+// Popup opened from the "Customer wise balance" chart: everything the loaded Excel holds for
+// one customer — totals, splits by metal / category / delivery month, and every order line.
+function CustomerDetails({ name, lines, filterNote, onClose }) {
+  const [query, setQuery] = useState("");
+  const [shown, setShown] = useState(CUSTOMER_PAGE);
+  const closeRef = useRef(null);
+
+  // Esc closes; the page behind stops scrolling while the popup is open.
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    const root = document.documentElement;
+    const prevOverflow = root.style.overflow;
+    root.style.overflow = "hidden";
+    closeRef.current?.focus();
+    return () => { document.removeEventListener("keydown", onKey); root.style.overflow = prevOverflow; };
+  }, [onClose]);
+
+  const t = useMemo(() => {
+    const sum = (key) => lines.reduce((s, r) => s + r[key], 0);
+    const balBy = (keyOf) => { const m = {}; lines.forEach((r) => { const g = keyOf(r); m[g] = (m[g] || 0) + r.bq; }); return m; };
+    const desc = (m) => Object.entries(m).map(([n, value]) => ({ name:n, value })).sort((a, b) => b.value - a.value);
+    const late = lines.filter((r) => r.d != null && r.d < 0);
+    const byMetal = balBy((r) => (METALS.includes(r.mt) ? r.mt : "Other"));
+    const byMonth = balBy((r) => r.mb);
+    const monthOrder = {}; lines.forEach((r) => { monthOrder[r.mb] = r.ms; });
+    return {
+      bq:sum("bq"), eq:sum("eq"), oq:sum("oq"), cp:sum("cp"), cw:sum("cw"), fq:sum("fq"),
+      latePcs:late.reduce((s, r) => s + r.bq, 0), lateLines:late.length,
+      // "SO/26/LGP/784/9" is line 9 of order SO/26/LGP/784
+      orders:new Set(lines.map((r) => r.sr.replace(/\/[^/]*$/, ""))).size,
+      byMetal:METALS.filter((me) => byMetal[me]).map((me) => ({ name:me, value:byMetal[me], color:METALC[me] })),
+      byCat:desc(balBy((r) => r.cat)),
+      byParty:desc(balBy((r) => r.p)),
+      byMonth:Object.keys(byMonth).sort((a, b) => monthOrder[a] - monthOrder[b]).map((n) => ({ name:n, value:byMonth[n] })),
+    };
+  }, [lines]);
+
+  // Earliest delivery date first, so the most overdue lines lead.
+  const matching = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const list = q ? lines.filter((r) => r.sr.toLowerCase().includes(q) || r.st.toLowerCase().includes(q)) : lines;
+    return [...list].sort((a, b) => a.due.localeCompare(b.due));
+  }, [lines, query]);
+
+  const multiParty = t.byParty.length > 1;
+  const num = { textAlign:"right", fontVariantNumeric:"tabular-nums" };
+  const th = { padding:"11px 10px", fontWeight:700, color:"#fff", whiteSpace:"nowrap" };
+  const td = { padding:"8px 10px", borderBottom:`1px solid ${C.line}`, whiteSpace:"nowrap" };
+  const tiles = [
+    ["Export balance", fmt(t.eq), "pcs"], ["Order qty", fmt(t.oq), "pcs"],
+    ["Casting pcs", fmt(t.cp), "pcs"], ["Casting wt", fmt2(t.cw), "g"], ["On floor", fmt(t.fq), "pcs"],
+    ["Overdue", fmt(t.latePcs), "pcs", `${fmt(t.lateLines)} lines late`],
+  ];
+
+  return (
+    <div className="modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal" role="dialog" aria-modal="true" aria-label={`${name} details`}>
+        <div className="modal-head">
+          <div style={{ minWidth:0 }}>
+            <div style={{ fontFamily:"'Fraunces',serif", fontWeight:700, fontSize:"clamp(17px,4.5vw,22px)", color:C.text, wordBreak:"break-word" }}>{name}</div>
+            <div style={{ fontSize:12, color:C.mut, marginTop:3, fontWeight:600 }}>
+              {fmt(lines.length)} order {lines.length === 1 ? "line" : "lines"} · {fmt(t.orders)} {t.orders === 1 ? "order" : "orders"}{filterNote && <span style={{ color:"var(--primary-dk)" }}> · filtered: {filterNote}</span>}
+            </div>
+          </div>
+          <button ref={closeRef} type="button" className="btn btn-icon" onClick={onClose} aria-label="Close" title="Close" style={{ flex:"none" }}>
+            <IconX width={16} height={16} />
+          </button>
+        </div>
+
+        <div className="modal-body">
+          {lines.length === 0 ? (
+            <div className="empty-state">
+              <IconInbox width={30} height={30} />
+              <div style={{ fontSize:13 }}>No order lines for this customer in the current selection.</div>
+            </div>
+          ) : (<>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(138px,1fr))", gap:12, marginBottom:16 }}>
+              {tiles.map(([label, value, unit, sub]) => (
+                <div key={label} className="card" style={{ padding:"13px 15px" }}>
+                  <div style={{ fontSize:10.5, letterSpacing:".06em", textTransform:"uppercase", fontWeight:800, color:"var(--mut)", marginBottom:8 }}>{label}</div>
+                  <div style={{ display:"flex", alignItems:"baseline", gap:5 }}>
+                    <span style={{ fontFamily:"'Fraunces',serif", fontSize:21, fontWeight:700, lineHeight:1, color:label === "Overdue" && t.latePcs ? "var(--danger-dk)" : "var(--text)", fontVariantNumeric:"tabular-nums" }}>{value}</span>
+                    <span style={{ fontSize:11.5, fontWeight:700, color:"var(--mut)" }}>{unit}</span>
+                  </div>
+                  {sub && <div style={{ fontSize:11, marginTop:7, fontWeight:600, color:"var(--mut)" }}>{sub}</div>}
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))", gap:12, marginBottom:16, alignItems:"start" }}>
+              <BreakdownList title="Balance by metal" items={t.byMetal} />
+              <BreakdownList title="Balance by category" items={t.byCat} />
+              <BreakdownList title="Balance by delivery month" items={t.byMonth} />
+              {multiParty && <BreakdownList title="Balance by party" items={t.byParty} />}
+            </div>
+
+            <div className="card" style={{ padding:16 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:12, flexWrap:"wrap", marginBottom:12 }}>
+                <div>
+                  <h3 style={{ margin:0, fontSize:13, fontWeight:800, letterSpacing:".04em", color:"var(--primary-dk)", textTransform:"uppercase" }}>Order lines</h3>
+                  <div style={{ fontSize:11, color:C.faint, marginTop:3 }}>earliest delivery date first</div>
+                </div>
+                <div className="input-wrap" style={{ width:"min(280px,100%)" }}>
+                  <IconSearch width={15} height={15} className="input-icon" />
+                  <input className="input" type="search" placeholder="Search order no. or style" value={query}
+                    onChange={(e) => { setQuery(e.target.value); setShown(CUSTOMER_PAGE); }} />
+                </div>
+              </div>
+              <div className="table-wrap">
+                <div className="table-scroll" style={{ maxHeight:"min(52vh,480px)" }}>
+                  <table style={{ fontSize:12.5 }}>
+                    <thead><tr style={{ fontSize:10.5, textTransform:"uppercase", letterSpacing:".05em" }}>
+                      <th style={{ ...th, textAlign:"left" }}>Order no.</th>
+                      {multiParty && <th style={{ ...th, textAlign:"left" }}>Party</th>}
+                      <th style={{ ...th, textAlign:"left" }}>Style</th>
+                      <th style={{ ...th, textAlign:"left" }}>Category</th>
+                      <th style={{ ...th, textAlign:"left" }}>Metal</th>
+                      <th style={{ ...th, textAlign:"left" }}>Ordered</th>
+                      <th style={{ ...th, textAlign:"left" }}>Delivery</th>
+                      <th style={{ ...th, ...num }}>Days</th>
+                      <th style={{ ...th, ...num }}>Order qty</th>
+                      <th style={{ ...th, ...num }}>Balance</th>
+                      <th style={{ ...th, ...num }}>Export bal</th>
+                      <th style={{ ...th, ...num }}>Casting pcs</th>
+                    </tr></thead>
+                    <tbody>
+                      {matching.slice(0, shown).map((r) => (
+                        <tr key={r.sr} className="hoverable">
+                          <td style={{ ...td, fontWeight:700, color:"var(--primary-dk)" }}>{r.sr}</td>
+                          {multiParty && <td style={td}>{r.p}</td>}
+                          <td style={td}>{r.st || "—"}</td>
+                          <td style={td}>{r.cat}</td>
+                          <td style={td}>
+                            <span className="pill-soft" style={{ background:`${METALC[r.mt] || METALC.Other}1f`, color:METALC[r.mt] || METALC.Other }}>
+                              <span className="dot" style={{ background:METALC[r.mt] || METALC.Other }} />{r.mt}{r.k && ` · ${r.k}`}
+                            </span>
+                          </td>
+                          <td style={td}>{r.od ? fmtDay(r.od) : "—"}</td>
+                          <td style={td}>{r.due ? fmtDay(r.due) : "—"}</td>
+                          <td style={{ ...td, ...num, fontWeight:700, color:r.d != null && r.d < 0 ? "var(--danger-dk)" : C.text }}>
+                            {r.d == null ? "—" : r.d < 0 ? `${fmt(-r.d)} late` : r.d === 0 ? "today" : `${fmt(r.d)} left`}
+                          </td>
+                          <td style={{ ...td, ...num }}>{fmt(r.oq)}</td>
+                          <td style={{ ...td, ...num, fontWeight:700 }}>{fmt(r.bq)}</td>
+                          <td style={{ ...td, ...num, color:C.primaryDk, fontWeight:700 }}>{fmt(r.eq)}</td>
+                          <td style={{ ...td, ...num, color:C.castBlue, fontWeight:700 }}>{fmt(r.cp)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {matching.length === 0 && <div className="empty-state" style={{ fontSize:13 }}>No order line matches “{query}”.</div>}
+                </div>
+              </div>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:12, flexWrap:"wrap", marginTop:12 }}>
+                <span style={{ fontSize:11.5, color:C.mut, fontVariantNumeric:"tabular-nums" }}>
+                  Showing {fmt(Math.min(shown, matching.length))} of {fmt(matching.length)} lines
+                </span>
+                {matching.length > shown && (
+                  <button type="button" className="btn btn-ghost" onClick={() => setShown((n) => n + CUSTOMER_PAGE)}>
+                    Show {fmt(Math.min(CUSTOMER_PAGE, matching.length - shown))} more
+                  </button>
+                )}
+              </div>
+            </div>
+          </>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const NAV_SECTIONS = [
   { key: "overview", label: "Overview" },
   { key: "casting", label: "Casting Plan" },
@@ -88,10 +279,7 @@ const NAV_SECTIONS = [
   { key: "partymix", label: "Party & Mix" },
 ];
 
-export default function Dashboard({ rows: ROWS, meta, funnel, fileName, updatedAt, onRefresh }) {
-  const updated = fmtUpdated(updatedAt);
-  const headerAsOf = asOfLabel(meta.asOf, updated);
-
+export default function Dashboard({ rows: ROWS, meta, funnel, fileName, fileTime, onRefresh }) {
   // Restored once per mount (e.g. after a page refresh); filters/sidebar state persists
   // independently of which Excel file is currently loaded.
   const [savedUi] = useState(() => loadUiSession() || {});
@@ -132,6 +320,20 @@ export default function Dashboard({ rows: ROWS, meta, funnel, fileName, updatedA
     return { oq, eq, bq, fq, cp, cw, lines: rows.length };
   }, [rows]);
 
+  // "Today" on the viewer's clock, re-checked each minute so the order cards roll over at midnight.
+  const [today, setToday] = useState(() => localYmd());
+  useEffect(() => {
+    const id = setInterval(() => setToday(localYmd()), 60000);
+    return () => clearInterval(id);
+  }, []);
+  const yesterday = shiftYmd(today, -1);
+
+  // Orders raised on a day = lines whose Order Dt is that day — respects current filters
+  const ordersIn = useMemo(() => {
+    const on = (day) => rows.reduce((a, r) => (r.od === day ? { pcs:a.pcs + r.oq, lines:a.lines + 1 } : a), { pcs:0, lines:0 });
+    return { today:on(today), yesterday:on(yesterday) };
+  }, [rows, today, yesterday]);
+
   // Casting weight split by metal (grams) — respects current filters
   const castWtByMetal = useMemo(() => {
     const m = { Gold:0, Silver:0, Platinum:0, Other:0 };
@@ -167,6 +369,13 @@ export default function Dashboard({ rows: ROWS, meta, funnel, fileName, updatedA
     const m = {}; base.forEach((r) => { m[r.c] = (m[r.c] || 0) + r.bq; });
     return Object.entries(m).map(([name, bq]) => ({ name, bq })).sort((a, b) => b.bq - a.bq); }, [ROWS, cat, metal]);
   const byPartyTotal = useMemo(() => byParty.reduce((s, c) => s + c.bq, 0), [byParty]);
+
+  // Customer picked in that chart -> details popup. Same rows the customer's bar is built
+  // from (category + metal filters, not the Party filter), so the popup total matches the bar.
+  const [selCustomer, setSelCustomer] = useState(null);
+  const closeCustomer = useCallback(() => setSelCustomer(null), []);
+  const customerLines = useMemo(() => (selCustomer == null ? [] : ROWS.filter((r) =>
+    r.c === selCustomer && (cat === "All" || r.cat === cat) && (metal === "All" || metalOf(r) === metal))), [ROWS, selCustomer, cat, metal]);
 
   const byCat = useMemo(() => { const m = {}; rows.forEach((r) => (m[r.cat] = (m[r.cat] || 0) + r.bq));
     return Object.entries(m).map(([name, qty]) => ({ name, qty })).sort((a, b) => b.qty - a.qty); }, [rows]);
@@ -272,9 +481,12 @@ export default function Dashboard({ rows: ROWS, meta, funnel, fileName, updatedA
                 <h1 style={{ margin:0, fontFamily:"'Fraunces',serif", fontWeight:700, fontSize:"clamp(16px,4.5vw,21px)", color:C.text, letterSpacing:"-.01em", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
                   Production &amp; Casting Dashboard
                 </h1>
-                {headerAsOf && (
+                {meta.asOf && (
                   <div style={{ fontSize:12, color:C.mut, marginTop:2, wordBreak:"break-word" }}>
-                    <span style={{ color:"var(--primary-dk)", fontWeight:700 }}>{headerAsOf}</span>
+                    <span style={{ color:"var(--primary-dk)", fontWeight:700 }}>Data as of {meta.asOf}</span>
+                    {fileTime != null && (
+                      <span style={{ color:"var(--primary-dk)", fontWeight:600 }}> · {new Date(fileTime).toLocaleTimeString("en-IN", { hour:"numeric", minute:"2-digit" })}</span>
+                    )}
                   </div>
                 )}
               </div>
@@ -286,7 +498,7 @@ export default function Dashboard({ rows: ROWS, meta, funnel, fileName, updatedA
               </button>
 
               <PopoverButton icon={<IconSettings width={16} height={16} />} label="File details" panelTitle="File details">
-                {[["Sheet", meta.sheetName], ["Header row", meta.headerRow], ["Order lines", fmt(ROWS.length)], ["Snapshot date", meta.asOf || "—"], ["Last updated", updated ? `${updated.date}, ${updated.time}` : "—"]].map(([k2, v]) => (
+                {[["Sheet", meta.sheetName], ["Header row", meta.headerRow], ["Order lines", fmt(ROWS.length)], ["Snapshot date", meta.asOf || "—"]].map(([k2, v]) => (
                   <div key={k2} style={{ display:"flex", justifyContent:"space-between", fontSize:12.5, padding:"5px 0", borderBottom:"1px solid var(--line-soft)" }}>
                     <span style={{ color:"var(--mut)" }}>{k2}</span><span style={{ fontWeight:700, color:"var(--text)" }}>{v}</span>
                   </div>
@@ -337,6 +549,13 @@ export default function Dashboard({ rows: ROWS, meta, funnel, fileName, updatedA
                 sparkline={monthlyTotals.map((m) => m.cp)} delay={40} />
             </div>
 
+            <div className="grid-stats" style={{ marginBottom:20 }}>
+              <StatCard label="Orders Raised Today" rawValue={ordersIn.today.pcs} format={fmt} unit="pcs" sub={`${fmt(ordersIn.today.lines)} lines · ${fmtDay(today)}`}
+                icon={<IconInbox width={20} height={20} />} accent={CH.emerald} tint="rgba(34,197,94,.13)" grad={GRAD_SUCCESS} delay={60} />
+              <StatCard label="Orders Raised Yesterday" rawValue={ordersIn.yesterday.pcs} format={fmt} unit="pcs" sub={`${fmt(ordersIn.yesterday.lines)} lines · ${fmtDay(yesterday)}`}
+                icon={<IconCalendar width={20} height={20} />} accent={CH.gold} tint="rgba(245,158,11,.14)" grad={GRAD_GOLD} delay={80} />
+            </div>
+
             <Panel title="Metal weight of balance casting pieces" hint="pure weight to cast (g / kg) · metal from Karat" style={{ marginBottom:20 }} delay={100}>
               <div style={{ display:"flex", gap:14, flexWrap:"wrap" }}>
                 <MetalCard name="Gold" grams={castWtByMetal.Gold} accent={CH.gold} tint="rgba(245,158,11,.14)" grad={GRAD_GOLD} sparkline={metalMonthly("Gold")} delay={0} />
@@ -348,15 +567,15 @@ export default function Dashboard({ rows: ROWS, meta, funnel, fileName, updatedA
 
           {/* ---------- Casting plan ---------- */}
           <div ref={sectionRefs.casting}>
-            <Panel title="Casting plan — month × metal" hint="Balance Qty · Casting pcs · Casting weight (g)" style={{ marginBottom:20 }} delay={140}>
+            <Panel title="Casting plan — month × metal" hint="Export balance qty · Casting balance pcs · Casting weight (g)" style={{ marginBottom:20 }} delay={140}>
               <div className="table-wrap">
                 <div className="table-scroll" style={{ maxHeight:420 }}>
                   <table style={{ fontSize:12.5 }}>
                     <thead><tr style={{ fontSize:10.5, textTransform:"uppercase", letterSpacing:".05em" }}>
                       <th style={{ textAlign:"left", padding:"11px 14px", fontWeight:700, color:"#fff" }}>Month</th>
                       <th style={{ textAlign:"left", padding:"11px 14px", fontWeight:700, color:"#fff" }}>Metal</th>
-                      <th style={{ ...num, padding:"11px 14px", fontWeight:700, color:"#fff" }}>Balance qty</th>
-                      <th style={{ ...num, padding:"11px 14px", fontWeight:700, color:"#fff" }}>Casting pcs</th>
+                      <th style={{ ...num, padding:"11px 14px", fontWeight:700, color:"#fff" }}>Export balance qty</th>
+                      <th style={{ ...num, padding:"11px 14px", fontWeight:700, color:"#fff" }}>Casting balance pcs</th>
                       <th style={{ ...num, padding:"11px 14px", fontWeight:700, color:"#fff" }}>Casting wt (g)</th>
                     </tr></thead>
                     <tbody>
@@ -433,14 +652,14 @@ export default function Dashboard({ rows: ROWS, meta, funnel, fileName, updatedA
                 {phase.map((p) => { const isStart = p.name === "New Order";
                   return (<div key={p.name}>
                     <div style={{ display:"flex", justifyContent:"space-between", fontSize:12, marginBottom:4 }}>
-                      <span style={{ color:C.text, display:"flex", alignItems:"center", gap:6 }}>
+                      <span style={{ color:C.text, display:"flex", alignItems:"center", gap:6, fontWeight:400 }}>
                         {p.name}
                       </span>
                       <span style={{ color:C.text, fontVariantNumeric:"tabular-nums", fontWeight:700 }}>{fmt(p.qty)}</span>
                     </div>
                     <div style={{ height:9, background:C.panel2, borderRadius:5, overflow:"hidden" }}>
                       <div style={{ width:`${100 * p.qty / maxPhase}%`, height:"100%", borderRadius:5, transition:"width .5s cubic-bezier(.16,1,.3,1)",
-                        background:isStart ? "var(--primary-lt)" : "var(--grad-primary)" }} />
+                        background:(isStart ? "var(--primary-lt)" : "var(--grad-primary)") }} />
                     </div></div>);
                 })}
                 {phase.length === 0 && (
@@ -455,24 +674,29 @@ export default function Dashboard({ rows: ROWS, meta, funnel, fileName, updatedA
 
           {/* ---------- Party & mix ---------- */}
           <div ref={sectionRefs.partymix} className="grid2" style={{ marginBottom:20 }}>
-            <Panel title="Customer wise balance" hint="all customers by balance qty" delay={260}
+            <Panel title="Customer wise balance" hint="all customers by balance qty · click a customer for full details" delay={260}
               right={
                 <span style={{ fontSize:11.5, color:C.mut, background:"var(--panel-2)", border:`1px solid ${C.line}`, borderRadius:999, padding:"5px 12px", fontVariantNumeric:"tabular-nums" }}>
                   Total: <b style={{ color:C.text, fontWeight:800 }}>{fmt(byPartyTotal)}</b> pcs
                 </span>
               }
             >
-              <ResponsiveContainer width="100%" height={Math.max(280, byParty.length * 28)}>
-                <BarChart data={byParty} layout="vertical" margin={{ top:4, right:56, left:8, bottom:0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={CH.line} horizontal={false} />
-                  <XAxis type="number" tick={{ fill:CH.faint, fontSize:11 }} axisLine={false} tickLine={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fill:CH.mut, fontSize:11 }} axisLine={false} tickLine={false} width={104} />
-                  <Tooltip content={<TT />} cursor={{ fill:"rgba(79,70,229,.06)" }} />
-                  <Bar dataKey="bq" name="Balance" fill={CH.primary} radius={[4,4,4,4]} isAnimationActive={!REDUCED_MOTION}>
-                    <LabelList dataKey="bq" content={PartyBarLabel} />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              {/* Clicking anywhere on a customer's row (bar, empty track, or name) opens that customer's details. */}
+              <div style={{ cursor:"pointer" }}>
+                <ResponsiveContainer width="100%" height={Math.max(280, byParty.length * 28)}>
+                  <BarChart data={byParty} layout="vertical" margin={{ top:4, right:56, left:8, bottom:0 }}
+                    onClick={(s) => { if (s && s.activeLabel != null) setSelCustomer(s.activeLabel); }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={CH.line} horizontal={false} />
+                    <XAxis type="number" tick={{ fill:CH.faint, fontSize:11 }} axisLine={false} tickLine={false} />
+                    <YAxis type="category" dataKey="name" tick={{ fill:CH.mut, fontSize:11 }} axisLine={false} tickLine={false} width={104}
+                      onClick={(tick) => setSelCustomer(tick.value)} />
+                    <Tooltip content={<TT />} cursor={{ fill:"rgba(79,70,229,.06)" }} />
+                    <Bar dataKey="bq" name="Balance" fill={CH.primary} radius={[4,4,4,4]} isAnimationActive={!REDUCED_MOTION}>
+                      <LabelList dataKey="bq" content={PartyBarLabel} />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </Panel>
             <Panel title="Product mix" hint="balance pcs by category" delay={280}
               right={
@@ -515,6 +739,11 @@ export default function Dashboard({ rows: ROWS, meta, funnel, fileName, updatedA
           <FooterTrigger />
         </footer>
       </div>
+
+      {selCustomer != null && (
+        <CustomerDetails key={selCustomer} name={selCustomer} lines={customerLines} onClose={closeCustomer}
+          filterNote={[metal !== "All" && metal, cat !== "All" && cat].filter(Boolean).join(" · ")} />
+      )}
     </div>
   );
 }
