@@ -100,6 +100,10 @@ function BreakdownList({ title, items }) {
 // Order lines listed per "Show more" step in the customer popup — the biggest customers have 1,500+.
 const CUSTOMER_PAGE = 100;
 
+// Overdue = BalDelvDays below -6 (i.e. -7, -8, -9 …). Lines 1–6 days late are not counted.
+const OVERDUE_BELOW = -6;
+const isOverdue = (r) => r.d != null && r.d < OVERDUE_BELOW;
+
 // Popup opened from the "Customer wise balance" chart: everything the loaded Excel holds for
 // one customer — totals, splits by metal / category / delivery month, and every order line.
 function CustomerDetails({ name, lines, filterNote, onClose }) {
@@ -122,7 +126,7 @@ function CustomerDetails({ name, lines, filterNote, onClose }) {
     const sum = (key) => lines.reduce((s, r) => s + r[key], 0);
     const balBy = (keyOf) => { const m = {}; lines.forEach((r) => { const g = keyOf(r); m[g] = (m[g] || 0) + r.bq; }); return m; };
     const desc = (m) => Object.entries(m).map(([n, value]) => ({ name:n, value })).sort((a, b) => b.value - a.value);
-    const late = lines.filter((r) => r.d != null && r.d < 0);
+    const late = lines.filter(isOverdue);
     const byMetal = balBy((r) => (METALS.includes(r.mt) ? r.mt : "Other"));
     const byMonth = balBy((r) => r.mb);
     const monthOrder = {}; lines.forEach((r) => { monthOrder[r.mb] = r.ms; });
@@ -240,7 +244,7 @@ function CustomerDetails({ name, lines, filterNote, onClose }) {
                           </td>
                           <td style={td}>{r.od ? fmtDay(r.od) : "—"}</td>
                           <td style={td}>{r.due ? fmtDay(r.due) : "—"}</td>
-                          <td style={{ ...td, ...num, fontWeight:700, color:r.d != null && r.d < 0 ? "var(--danger-dk)" : C.text }}>
+                          <td style={{ ...td, ...num, fontWeight:700, color:isOverdue(r) ? "var(--danger-dk)" : C.text }}>
                             {r.d == null ? "—" : r.d < 0 ? `${fmt(-r.d)} late` : r.d === 0 ? "today" : `${fmt(r.d)} left`}
                           </td>
                           <td style={{ ...td, ...num }}>{fmt(r.oq)}</td>
