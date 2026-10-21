@@ -196,6 +196,7 @@ export function parseWorkbook(arrayBuffer) {
     expQty: idxOf("Exp Bal Qty", "Export Qty", "Exp Bal Qty."),
     unitWt: idxOf("Unit Metal PureWt", "UnitWeight", "Unit Weight", "Unit Metal Pure Wt"),
     balQty: idxOf("Bal Qty"),
+    amendQty: idxOf("Amend Qty"),
   };
 
   const stageIdx = {};
@@ -248,6 +249,7 @@ export function parseWorkbook(arrayBuffer) {
       mt: metalFromKarat(karat),
       bq: Math.round(bq),
       oq: col.orderQty >= 0 ? Math.round(toNum(row[col.orderQty])) : 0,
+      am: col.amendQty >= 0 ? toNum(row[col.amendQty]) : 0,
       eq: Math.round(eq),
       fq: Math.round(eq - offFloor),
       od: oDate ? ymd(oDate) : "",

@@ -100,9 +100,10 @@ function BreakdownList({ title, items }) {
 // Order lines listed per "Show more" step in the customer popup — the biggest customers have 1,500+.
 const CUSTOMER_PAGE = 100;
 
-// Overdue = BalDelvDays below -6 (i.e. -7, -8, -9 …). Lines 1–6 days late are not counted.
+// Overdue = BalDelvDays below -6 (i.e. -7, -8, -9 …). Lines 1–6 days late are not counted,
+// and neither are lines with an Amend Qty — the order was amended, so it isn't treated as late.
 const OVERDUE_BELOW = -6;
-const isOverdue = (r) => r.d != null && r.d < OVERDUE_BELOW;
+const isOverdue = (r) => r.d != null && r.d < OVERDUE_BELOW && !r.am;
 
 // Popup opened from the "Customer wise balance" chart: everything the loaded Excel holds for
 // one customer — totals, splits by metal / category / delivery month, and every order line.
@@ -154,7 +155,7 @@ function CustomerDetails({ name, lines, filterNote, onClose }) {
   const th = { padding:"11px 10px", fontWeight:700, color:"#fff", whiteSpace:"nowrap" };
   const td = { padding:"8px 10px", borderBottom:`1px solid ${C.line}`, whiteSpace:"nowrap" };
   const tiles = [
-    ["Export balance", fmt(t.eq), "pcs"], ["Order qty", fmt(t.oq), "pcs"],
+    ["Order qty", fmt(t.oq), "pcs"], ["Export balance", fmt(t.eq), "pcs"],
     ["Casting pcs", fmt(t.cp), "pcs"], ["Casting wt", fmt2(t.cw), "g"], ["On floor", fmt(t.fq), "pcs"],
     ["Overdue", fmt(t.latePcs), "pcs", `${fmt(t.lateLines)} lines late`],
   ];
