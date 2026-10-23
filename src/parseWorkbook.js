@@ -7,7 +7,7 @@ import * as XLSX from "xlsx";
 //   Metal  = derived ONLY from Karat (col S):
 //            contains G/g -> Gold, else P/p -> Platinum, else S/s -> Silver
 //   Month  = production delivery date (Prd Delv Dt, col L)
-//   On floor = Exp Bal Qty - (PCELL + FG + SHP3 + SHP4 + RGTS)
+//   On floor = Exp Bal Qty - (PCELL + FG + SHP3 + SHP4 + RGTS + Casting Bal pcs)
 //   Orders raised on a day = lines whose Order Dt is that day (qty = Order Qty)
 //   Production Funnel = the sheet's OWN pre-computed column totals, one row above
 //            the header row (see FUNNEL_MAPPING below), not summed from order lines.
@@ -22,8 +22,8 @@ const TARGET_YEAR = 2026;
 
 const CAST_STAGES = ["SO","PMDR","PWAX-A","PWAX-B","PWAX","PWXST","PWBGD","PWBGD-LGD","PTRI"];
 
-// On floor = Exp Bal Qty minus the pieces already out of production: in GSI, finished goods,
-// shipping and RGTS.
+// On floor = Exp Bal Qty minus the pieces already out of production (in GSI, finished goods,
+// shipping and RGTS) and minus the pieces still waiting for casting ("Casting Bal pcs").
 const OFF_FLOOR_STAGES = ["PCELL","FG","SHP3","SHP4","RGTS"];
 
 // Production Funnel mapping (per-column, supplied manually). Each header's value is
@@ -197,6 +197,7 @@ export function parseWorkbook(arrayBuffer) {
     unitWt: idxOf("Unit Metal PureWt", "UnitWeight", "Unit Weight", "Unit Metal Pure Wt"),
     balQty: idxOf("Bal Qty"),
     amendQty: idxOf("Amend Qty"),
+    castBal: idxOf("Casting Bal pcs"),
   };
 
   const stageIdx = {};
@@ -236,6 +237,8 @@ export function parseWorkbook(arrayBuffer) {
     const eq = col.expQty >= 0 ? toNum(row[col.expQty]) : 0;
     let offFloor = 0;
     for (const ci of offFloorIdx) offFloor += toNum(row[ci]);
+    // The sheet's own "Casting Bal pcs" column; older exports without it fall back to our Casting pcs.
+    offFloor += col.castBal >= 0 ? toNum(row[col.castBal]) : cp;
 
     const { mb, ms } = monthBucket(dDate);
     const catRaw = col.category >= 0 ? norm(row[col.category]) : "";
