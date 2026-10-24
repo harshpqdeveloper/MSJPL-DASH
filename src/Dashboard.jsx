@@ -6,9 +6,10 @@ import { Segmented, PopoverButton, CH, TT, useCountUp, MiniBars, StatCard, Panel
 import {
   IconRefresh, IconChevronDown, IconInbox, IconSettings,
   IconMenu, IconChevronLeft, IconGrid, IconUser, IconGem,
-  IconLayers, IconTrendingUp, IconShieldCheck, IconCalendar, IconX, IconSearch,
+  IconLayers, IconTrendingUp, IconShieldCheck, IconCalendar, IconX, IconSearch, IconUsers, IconLogOut,
 } from "./icons.jsx";
 import { loadUiSession, saveUiSession } from "./sessionPersistence.js";
+import { useSession } from "./auth/session.js";
 import FooterTrigger from "./analytics/FooterTrigger.jsx";
 
 const METALS = ["Gold","Silver","Platinum","Other"];
@@ -285,6 +286,8 @@ const NAV_SECTIONS = [
 ];
 
 export default function Dashboard({ rows: ROWS, meta, funnel, fileName, fileTime, onRefresh }) {
+  const { session, logout } = useSession();
+
   // Restored once per mount (e.g. after a page refresh); filters/sidebar state persists
   // independently of which Excel file is currently loaded.
   const [savedUi] = useState(() => loadUiSession() || {});
@@ -513,9 +516,19 @@ export default function Dashboard({ rows: ROWS, meta, funnel, fileName, fileTime
                 )}
               </PopoverButton>
 
-              <PopoverButton icon={<IconUser width={16} height={16} />} label="Session" panelTitle="Local session">
-                <div style={{ fontSize:12.5, color:"var(--mut)", lineHeight:1.6 }}>
-                  The Excel file is read from this server's excel folder and parsed entirely in your browser tab. Nothing leaves your local network, and no login is required.
+              <PopoverButton icon={<IconUser width={16} height={16} />} label="Account" panelTitle="Account">
+                <div style={{ fontSize:12.5, color:"var(--mut)", lineHeight:1.6, marginBottom:12, wordBreak:"break-word" }}>
+                  Signed in as <b style={{ color:"var(--text)" }}>{session?.username}</b>{session?.isAdmin && " (admin)"}
+                </div>
+                <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                  {session?.isAdmin && (
+                    <a href="/admin" className="btn btn-ghost" style={{ justifyContent:"center", textDecoration:"none" }}>
+                      <IconUsers width={15} height={15} /> Manage users
+                    </a>
+                  )}
+                  <button type="button" className="btn btn-ghost" onClick={logout} style={{ justifyContent:"center" }}>
+                    <IconLogOut width={15} height={15} /> Log out
+                  </button>
                 </div>
               </PopoverButton>
             </div>

@@ -2,6 +2,7 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { excelFolderPlugin } from "./vite-excel-plugin.js";
 import { analyticsApiPlugin } from "./vite-analytics-plugin.js";
+import { authApiPlugin } from "./vite-auth-plugin.js";
 
 // base: "./" lets the built app be served from any folder/path.
 // host: true exposes the dev & preview servers on the local network (0.0.0.0).
@@ -13,7 +14,7 @@ export default defineConfig(({ mode }) => {
   Object.assign(process.env, loadEnv(mode, process.cwd(), ""));
 
   return {
-    plugins: [react(), excelFolderPlugin(), analyticsApiPlugin()],
+    plugins: [react(), excelFolderPlugin(), analyticsApiPlugin(), authApiPlugin()],
     base: "./",
     // excel/ is read directly by excelFolderPlugin on each request, not via HMR, so it
     // doesn't need to be watched. Watching it is actively harmful: Excel drops short-lived

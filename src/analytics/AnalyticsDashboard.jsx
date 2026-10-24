@@ -10,6 +10,93 @@ import {
 
 const fmt = (n) => Math.round(n || 0).toLocaleString("en-IN");
 const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
+const fmtWhen = (iso) => (iso ? new Date(iso).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" }) : "—");
+
+const TH = { padding: "11px 14px", fontWeight: 700, color: "#fff", whiteSpace: "nowrap" };
+const TD = { padding: "9px 14px", borderBottom: `1px solid ${C.line}`, whiteSpace: "nowrap" };
+const NUM = { textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700 };
+
+const AdminBadge = () => (
+  <span className="pill-soft" style={{ background: "rgba(79,70,229,.12)", color: "var(--primary-dk)", marginLeft: 7, fontSize: 10 }}>admin</span>
+);
+
+// Who signed in, when, and how often they opened the dashboard. Needs
+// supabase/user-activity-setup.sql to have been run once; until then, says so.
+function UserActivity({ data, rangeLabel }) {
+  if (!data.userTrackingReady) {
+    return (
+      <Panel title="User activity" hint="who signed in, when, and how often" style={{ marginBottom: 20 }} delay={100}>
+        <div style={{ display: "flex", gap: 12, alignItems: "flex-start", fontSize: 13, lineHeight: 1.6 }}>
+          <IconAlertTriangle width={18} height={18} style={{ color: "var(--warning-dk)", flex: "none", marginTop: 2 }} />
+          <div>
+            User activity is not switched on yet. Run <code>supabase/user-activity-setup.sql</code> once in
+            Supabase → SQL Editor, then refresh this page. Logins and visits are recorded from then on.
+          </div>
+        </div>
+      </Panel>
+    );
+  }
+
+  return (
+    <>
+      <Panel title="User activity" hint={`logins and visits · ${rangeLabel} · last login / last visit are all-time`} style={{ marginBottom: 20 }} delay={100}>
+        {data.userActivity.length === 0 ? <EmptyState label="No users or sign-ins yet." /> : (
+          <div className="table-wrap">
+            <div className="table-scroll" style={{ maxHeight: 420 }}>
+              <table style={{ fontSize: 12.5 }}>
+                <thead><tr style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em" }}>
+                  <th style={{ ...TH, textAlign: "left" }}>User</th>
+                  <th style={{ ...TH, textAlign: "left" }}>Last login</th>
+                  <th style={{ ...TH, textAlign: "right" }}>Logins</th>
+                  <th style={{ ...TH, textAlign: "right" }}>Visits</th>
+                  <th style={{ ...TH, textAlign: "left" }}>Last visit</th>
+                </tr></thead>
+                <tbody>
+                  {data.userActivity.map((u) => (
+                    <tr key={u.username} className="hoverable zebra">
+                      <td style={{ ...TD, fontWeight: 700, color: "var(--primary-dk)" }}>{u.username}{u.isAdmin && <AdminBadge />}</td>
+                      <td style={TD} title={u.lastDevice || undefined}>{u.lastLogin ? fmtWhen(u.lastLogin) : <span style={{ color: C.faint }}>Never</span>}</td>
+                      <td style={{ ...TD, ...NUM }}>{fmt(u.logins)}</td>
+                      <td style={{ ...TD, ...NUM }}>{fmt(u.visits)}</td>
+                      <td style={TD}>{fmtWhen(u.lastVisit)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </Panel>
+
+      <Panel title="Recent logins" hint={`every sign-in · ${rangeLabel} · newest first`} style={{ marginBottom: 20 }} delay={120}>
+        {data.recentLogins.length === 0 ? <EmptyState label="No sign-ins in this range." /> : (
+          <div className="table-wrap">
+            <div className="table-scroll" style={{ maxHeight: 420 }}>
+              <table style={{ fontSize: 12.5 }}>
+                <thead><tr style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em" }}>
+                  <th style={{ ...TH, textAlign: "left" }}>When</th>
+                  <th style={{ ...TH, textAlign: "left" }}>User</th>
+                  <th style={{ ...TH, textAlign: "left" }}>Device</th>
+                </tr></thead>
+                <tbody>
+                  {data.recentLogins.map((l, i) => (
+                    <tr key={`${l.at}-${i}`} className="hoverable zebra">
+                      <td style={TD}>{fmtWhen(l.at)}</td>
+                      <td style={{ ...TD, fontWeight: 700, color: "var(--primary-dk)" }}>{l.username}{l.isAdmin && <AdminBadge />}</td>
+                      <td style={{ ...TD, color: C.mut }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>{DEVICE_ICONS[l.deviceType]}{l.device}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </Panel>
+    </>
+  );
+}
 
 const RANGE_OPTIONS = [
   { key: "today", label: "Today" },
@@ -144,7 +231,8 @@ export default function AnalyticsDashboard({ onLoggedOut }) {
   };
 
   const logout = async () => {
-    try { await fetch("/api/analytics/logout", { method: "POST" }); } catch { /* ignore */ }
+    // Signs out of the dashboard too — the admin's one sign-in covers both.
+    try { await fetch("/api/auth/logout", { method: "POST" }); } catch { /* ignore */ }
     onLoggedOut();
   };
 
@@ -262,6 +350,9 @@ export default function AnalyticsDashboard({ onLoggedOut }) {
             </ResponsiveContainer>
           )}
         </Panel>
+
+        {/* ---------- Signed-in users ---------- */}
+        {data && <UserActivity data={data} rangeLabel={activeRangeOption.label} />}
 
         {/* ---------- Breakdown panels ---------- */}
         {data && (

@@ -21,6 +21,23 @@ sensitive jewellery/gold data.
 
 ---
 
+## Login & users
+
+The dashboard asks for an **ID and password** before it shows anything, and the Excel data
+API (`/api/excel/*`) refuses requests without a valid session.
+
+- **Admin** signs in with `ANALYTICS_ADMIN_EMAIL` / `ANALYTICS_ADMIN_PASSWORD` (the same login
+  as `/analytics`). The admin opens **`/admin`** (or *Account → Manage users*) to add users,
+  reset a password, or remove a user. New passwords are generated automatically and shown
+  once — copy them and send them to the person.
+- **Users** are stored in the private Supabase bucket as `auth/users.json` (passwords are
+  hashed). Removing a user or resetting their password signs them out within ~30 seconds.
+- Sessions last 12 hours. Required env vars (locally in `.env`, and on Vercel):
+  `ANALYTICS_ADMIN_EMAIL`, `ANALYTICS_ADMIN_PASSWORD`, `ANALYTICS_SESSION_SECRET`,
+  `SUPABASE_URL`, `SUPABASE_SECRET_KEY`.
+
+---
+
 ## How the numbers are calculated (for reference)
 
 - **Casting pcs** = sum of stage columns **AE:AM** (SO, PMDR, PWAX-A/B, PWAX, PWXST, PWBGD, PWBGD-LGD, PTRI) — this is column **AN**.

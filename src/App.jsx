@@ -7,6 +7,7 @@ import logo from "./assets/logo.png";
 import { C, GLOBAL_CSS } from "./theme.js";
 import { IconFileWarning, IconInbox } from "./icons.jsx";
 import { trackVisit } from "./analytics/trackVisit.js";
+import { useSession } from "./auth/session.js";
 
 // How often to re-check the excel/ folder for a new or updated file once the
 // dashboard is up. Cheap: it's just a small JSON status fetch unless the file
@@ -21,6 +22,7 @@ export default function App() {
   const [error, setError] = useState("");
   const [introDone, setIntroDone] = useState(false);
   const signatureRef = useRef(""); // `${fileName}:${mtimeMs}` of the currently-loaded file
+  const { expired } = useSession();
 
   const loadLatest = useCallback(async () => {
     let metaRes, metaJson;
@@ -34,6 +36,9 @@ export default function App() {
       return;
     }
 
+    // Signed out on the server (user removed, password reset, or session timed out).
+    if (metaRes.status === 401) { expired(); return; }
+
     if (!metaRes.ok || !metaJson.found) {
       signatureRef.current = "";
       setData(null); setFileName(""); setError("");
@@ -46,6 +51,7 @@ export default function App() {
 
     try {
       const fileRes = await fetch("/api/excel/file", { cache: "no-store" });
+      if (fileRes.status === 401) { expired(); return; }
       if (!fileRes.ok) {
         const body = await fileRes.json().catch(() => ({}));
         throw new Error(body.error || "Could not load the Excel file from the server.");
@@ -70,7 +76,7 @@ export default function App() {
       setError(e.message || "Could not read this file. Make sure it is the production WIP export.");
       setStatus("error");
     }
-  }, []);
+  }, [expired]);
 
   useEffect(() => {
     loadLatest();
